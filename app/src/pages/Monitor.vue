@@ -115,7 +115,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from "vue";
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from "vue";
 import { ElMessage } from "element-plus";
 import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
@@ -130,6 +130,9 @@ const busy = ref(false);
 const drawerVisible = ref(false);
 const selectedId = ref(null);
 const tableRef = ref(null);
+// 记录用户是否手动向上滚动过（偏离底部超过阈值则视为手动滚动）
+const autoScrollEnabled = ref(true);
+const SCROLL_THRESHOLD = 60;
 
 // 导出相关状态
 const selectedRows = ref([]);
@@ -347,6 +350,53 @@ async function deleteSelected() {
   }
 }
 
+/** 获取表格滚动容器 DOM，按多个可能的选择器尝试。 */
+function getScrollEl() {
+  const root = tableRef.value?.$el;
+  if (!root) return null;
+  // Element Plus v2: el-scrollbar 内部
+  return (
+    root.querySelector(".el-scrollbar__wrap") ||
+    root.querySelector(".el-table__body-wrapper") ||
+    root.querySelector(".el-table__body-wrapper-inner")
+  );
+}
+
+/** 判断表格是否已滚动到底部（允许一定阈值）。 */
+function isScrolledToBottom() {
+  const el = getScrollEl();
+  if (!el) return true;
+  return el.scrollHeight - el.scrollTop - el.clientHeight < SCROLL_THRESHOLD;
+}
+
+/** 将表格滚动到底部，延迟确保 DOM 已渲染完新行。 */
+function scrollToBottom() {
+  nextTick(() => {
+    const el = getScrollEl();
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+    }
+  });
+}
+
+/** 监听用户滚动行为：偏离底部时暂停自动滚动，回到底部时恢复。 */
+function handleTableScroll() {
+  if (isScrolledToBottom()) {
+    autoScrollEnabled.value = true;
+  } else {
+    autoScrollEnabled.value = false;
+  }
+}
+
+/** 新流量到来时，若处于自动滚动模式则滚到底部。 */
+watch(
+  () => traffic.list.length,
+  () => {
+    if (autoScrollEnabled.value) scrollToBottom();
+  },
+  { flush: "post" },
+);
+
 async function handleKeydown(event) {
   if (
     event.ctrlKey &&
@@ -360,16 +410,28 @@ async function handleKeydown(event) {
   }
 }
 
+let scrollEl = null;
+
 onMounted(async () => {
   document.addEventListener("click", handleClick);
   window.addEventListener("keydown", handleKeydown);
   await traffic.init();
   await refreshProxyStatus();
+  // 初始滚动到底部
+  scrollToBottom();
+  // 监听表格体滚动事件，判断用户是否手动滚动
+  nextTick(() => {
+    scrollEl = getScrollEl();
+    if (scrollEl) {
+      scrollEl.addEventListener("scroll", handleTableScroll, { passive: true });
+    }
+  });
 });
 
 onBeforeUnmount(() => {
   document.removeEventListener("click", handleClick);
   window.removeEventListener("keydown", handleKeydown);
+  if (scrollEl) scrollEl.removeEventListener("scroll", handleTableScroll);
 });
 </script>
 
