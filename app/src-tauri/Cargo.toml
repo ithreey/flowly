@@ -1,0 +1,38 @@
+[package]
+name = "flowly-gui"
+version = "0.1.0"
+description = "Flowly desktop GUI"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+async-trait = "0.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time"] }
+moka = { version = "0.11", features = ["sync"] }
+x509-parser = "0.14"
+winreg = "0.52"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.52", features = ["Win32_Networking_WinInet", "Win32_Foundation"] }
+
+flowly = { path = "../..", package = "flowly", default-features = false }
+mitm-core = { path = "../../crates/core", package = "flowly-core", default-features = false, features = ["h2"] }
+rule = { path = "../../crates/rule", package = "flowly-rule", default-features = false }
+trust_cert = { path = "../../crates/trust_cert" }
+rustls-pemfile = "1.0"
+rustls = "0.21"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "net", "io-util", "rt-multi-thread"] }
+tauri = { version = "2", features = ["test"] }
+
+# 空 [workspace] 表：将本 crate 从根 workspace 中剔出，
+# 获得独立的 Cargo.lock 与 feature 解析，避免 openssl 被 feature-unify 拖入 GUI。
+[workspace]

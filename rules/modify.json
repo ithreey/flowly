@@ -1,0 +1,20 @@
+[
+  {
+    "name": "modify response body plain",
+    "filters": [
+      {
+        "domainKeyword": "speedbiz-api-dev"
+      }
+    ],
+    "actions": [
+      {
+        "modifyResponse": {
+          "body": {
+            "origin": "已入库",
+            "new": "Flowly 首页"
+          }
+        }
+      }
+    ]
+  }
+]

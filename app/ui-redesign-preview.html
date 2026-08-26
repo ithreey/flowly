@@ -1,0 +1,888 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Flowly UI Preview</title>
+    <style>
+      :root {
+        --bg: #08111f;
+        --panel: #0f1b2d;
+        --panel-2: #121f33;
+        --panel-3: #17263c;
+        --line: rgba(148, 163, 184, 0.18);
+        --line-strong: rgba(56, 189, 248, 0.34);
+        --text: #e5edf8;
+        --muted: #8fa1b7;
+        --subtle: #65748a;
+        --green: #22c55e;
+        --cyan: #38bdf8;
+        --blue: #3b82f6;
+        --amber: #f59e0b;
+        --red: #f87171;
+        --purple: #a78bfa;
+        --shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        overflow: hidden;
+        background:
+          radial-gradient(
+            circle at 18% 12%,
+            rgba(56, 189, 248, 0.16),
+            transparent 32%
+          ),
+          linear-gradient(135deg, #08111f 0%, #0a1020 52%, #0b1625 100%);
+        color: var(--text);
+        font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+        font-size: 14px;
+      }
+
+      body::before {
+        position: fixed;
+        inset: 0;
+        content: "";
+        pointer-events: none;
+        background-image:
+          linear-gradient(rgba(148, 163, 184, 0.055) 1px, transparent 1px),
+          linear-gradient(
+            90deg,
+            rgba(148, 163, 184, 0.045) 1px,
+            transparent 1px
+          );
+        background-size: 42px 42px;
+        mask-image: linear-gradient(
+          to bottom,
+          rgba(0, 0, 0, 0.72),
+          transparent 82%
+        );
+      }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      .shell {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: 236px minmax(0, 1fr);
+        width: 100vw;
+        height: 100vh;
+      }
+
+      .sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        padding: 18px 14px;
+        border-right: 1px solid var(--line);
+        background: rgba(8, 17, 31, 0.78);
+        backdrop-filter: blur(18px);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 8px 14px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .brand-mark {
+        display: grid;
+        width: 38px;
+        height: 38px;
+        place-items: center;
+        border: 1px solid rgba(56, 189, 248, 0.48);
+        border-radius: 10px;
+        background: linear-gradient(
+          145deg,
+          rgba(56, 189, 248, 0.22),
+          rgba(34, 197, 94, 0.12)
+        );
+        box-shadow: inset 0 0 24px rgba(56, 189, 248, 0.12);
+        color: var(--cyan);
+        font-family: "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+        font-weight: 700;
+      }
+
+      .brand-title {
+        font-size: 16px;
+        font-weight: 700;
+        letter-spacing: 0;
+      }
+
+      .brand-subtitle {
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .nav {
+        display: grid;
+        gap: 6px;
+      }
+
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 11px 12px;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        color: var(--muted);
+      }
+
+      .nav-item.active {
+        border-color: var(--line-strong);
+        background: rgba(56, 189, 248, 0.11);
+        color: var(--text);
+        box-shadow: inset 3px 0 0 var(--cyan);
+      }
+
+      .nav-icon {
+        display: grid;
+        width: 22px;
+        height: 22px;
+        place-items: center;
+        color: inherit;
+      }
+
+      .nav-icon svg {
+        width: 18px;
+        height: 18px;
+        stroke: currentColor;
+        stroke-width: 1.8;
+        fill: none;
+      }
+
+      .sidebar-footer {
+        margin-top: auto;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(15, 27, 45, 0.64);
+      }
+
+      .mini-label {
+        color: var(--subtle);
+        font-size: 11px;
+        text-transform: uppercase;
+      }
+
+      .health {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 8px;
+      }
+
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--green);
+        box-shadow: 0 0 16px rgba(34, 197, 94, 0.7);
+      }
+
+      .workspace {
+        display: grid;
+        grid-template-rows: 74px minmax(0, 1fr);
+        min-width: 0;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        padding: 16px 22px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(11, 22, 37, 0.66);
+        backdrop-filter: blur(18px);
+      }
+
+      .page-title h1 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 700;
+      }
+
+      .page-title p {
+        margin: 4px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .top-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .status-pill,
+      .btn,
+      .chip,
+      .method,
+      .code-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 7px;
+        white-space: nowrap;
+      }
+
+      .status-pill {
+        gap: 8px;
+        height: 34px;
+        padding: 0 12px;
+        border: 1px solid rgba(34, 197, 94, 0.32);
+        background: rgba(34, 197, 94, 0.1);
+        color: #b7f7c9;
+      }
+
+      .btn {
+        height: 34px;
+        padding: 0 13px;
+        border: 1px solid var(--line);
+        background: rgba(15, 27, 45, 0.9);
+        color: var(--text);
+        transition:
+          border-color 180ms ease,
+          background 180ms ease,
+          color 180ms ease;
+      }
+
+      .btn:hover {
+        border-color: rgba(56, 189, 248, 0.55);
+        background: rgba(56, 189, 248, 0.14);
+      }
+
+      .btn.primary {
+        border-color: rgba(34, 197, 94, 0.45);
+        background: linear-gradient(
+          180deg,
+          rgba(34, 197, 94, 0.94),
+          rgba(21, 128, 61, 0.92)
+        );
+        color: #04140a;
+        font-weight: 700;
+      }
+
+      .content {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 420px;
+        gap: 16px;
+        min-height: 0;
+        padding: 16px;
+      }
+
+      .main-panel,
+      .detail-panel,
+      .rules-panel {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: rgba(15, 27, 45, 0.78);
+        box-shadow: var(--shadow);
+      }
+
+      .main-panel {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) 164px;
+        overflow: hidden;
+      }
+
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .search {
+        width: min(420px, 34vw);
+        height: 34px;
+        padding: 0 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        outline: none;
+        background: rgba(8, 17, 31, 0.72);
+        color: var(--text);
+      }
+
+      .search:focus {
+        border-color: var(--cyan);
+        box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
+      }
+
+      .chip {
+        height: 30px;
+        padding: 0 10px;
+        border: 1px solid var(--line);
+        background: rgba(8, 17, 31, 0.56);
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .chip.active {
+        border-color: rgba(56, 189, 248, 0.44);
+        color: var(--cyan);
+      }
+
+      .traffic-table {
+        min-height: 0;
+        overflow: auto;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        padding: 10px 12px;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+        text-align: left;
+      }
+
+      th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: rgba(12, 24, 39, 0.96);
+        color: var(--subtle);
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+      }
+
+      tr {
+        transition: background 160ms ease;
+      }
+
+      tbody tr:hover {
+        background: rgba(56, 189, 248, 0.07);
+      }
+
+      tbody tr.selected {
+        background: rgba(56, 189, 248, 0.12);
+      }
+
+      .method,
+      .code-pill {
+        height: 24px;
+        min-width: 52px;
+        padding: 0 8px;
+        font-family: "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .method.get {
+        background: rgba(56, 189, 248, 0.13);
+        color: #7dd3fc;
+      }
+
+      .method.post {
+        background: rgba(167, 139, 250, 0.14);
+        color: #c4b5fd;
+      }
+
+      .method.patch {
+        background: rgba(245, 158, 11, 0.13);
+        color: #fcd34d;
+      }
+
+      .code-pill.ok {
+        background: rgba(34, 197, 94, 0.14);
+        color: #86efac;
+      }
+
+      .code-pill.warn {
+        background: rgba(245, 158, 11, 0.13);
+        color: #fcd34d;
+      }
+
+      .code-pill.err {
+        background: rgba(248, 113, 113, 0.13);
+        color: #fca5a5;
+      }
+
+      .url-main {
+        color: #d9e6f6;
+        font-family: "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+        font-size: 12px;
+      }
+
+      .url-muted,
+      .meta {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .num {
+        color: #dbeafe;
+        font-family: "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+        text-align: right;
+      }
+
+      .rules-panel {
+        display: grid;
+        grid-template-rows: auto 1fr;
+        margin: 0 12px 12px;
+        box-shadow: none;
+      }
+
+      .panel-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 12px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .panel-title {
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .rule-list {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        padding: 12px;
+      }
+
+      .rule-card {
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(8, 17, 31, 0.42);
+      }
+
+      .rule-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+
+      .switch {
+        width: 34px;
+        height: 18px;
+        border-radius: 999px;
+        background: rgba(34, 197, 94, 0.28);
+        box-shadow: inset 16px 0 0 var(--green);
+      }
+
+      .rule-name {
+        font-weight: 700;
+      }
+
+      .detail-panel {
+        display: grid;
+        grid-template-rows: auto auto minmax(0, 1fr);
+        overflow: hidden;
+      }
+
+      .detail-header {
+        padding: 14px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .detail-url {
+        margin-top: 10px;
+        color: #dbeafe;
+        font-family: "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+        font-size: 12px;
+        line-height: 1.55;
+        word-break: break-all;
+      }
+
+      .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        padding: 12px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .metric {
+        padding: 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(8, 17, 31, 0.42);
+      }
+
+      .metric-value {
+        margin-top: 5px;
+        color: var(--text);
+        font-family: "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+        font-weight: 700;
+      }
+
+      .tabs {
+        display: flex;
+        gap: 6px;
+        padding: 12px 12px 0;
+      }
+
+      .tab {
+        padding: 8px 12px;
+        border: 1px solid transparent;
+        border-radius: 8px 8px 0 0;
+        color: var(--muted);
+      }
+
+      .tab.active {
+        border-color: var(--line);
+        border-bottom-color: transparent;
+        background: rgba(8, 17, 31, 0.48);
+        color: var(--cyan);
+      }
+
+      .detail-body {
+        min-height: 0;
+        overflow: auto;
+        padding: 12px;
+      }
+
+      .section-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin: 8px 0 7px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      pre {
+        margin: 0;
+        padding: 12px;
+        overflow: auto;
+        border: 1px solid rgba(56, 189, 248, 0.18);
+        border-radius: 8px;
+        background: #07101d;
+        color: #cde6ff;
+        font-family: "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
+      .copy {
+        border: 0;
+        background: transparent;
+        color: var(--cyan);
+        font-size: 12px;
+      }
+
+      @media (max-width: 1180px) {
+        .shell {
+          grid-template-columns: 78px minmax(0, 1fr);
+        }
+
+        .brand-copy,
+        .nav-label,
+        .sidebar-footer {
+          display: none;
+        }
+
+        .nav-item,
+        .brand {
+          justify-content: center;
+        }
+
+        .content {
+          grid-template-columns: 1fr;
+        }
+
+        .detail-panel {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">FL</div>
+          <div class="brand-copy">
+            <div class="brand-title">Flowly</div>
+            <div class="brand-subtitle">Proxy Inspection Console</div>
+          </div>
+        </div>
+
+        <nav class="nav" aria-label="主导航">
+          <div class="nav-item active">
+            <span class="nav-icon">
+              <svg viewBox="0 0 24 24">
+                <path d="M4 18V7m4 11V4m4 14v-7m4 7V9m4 9V6" />
+              </svg>
+            </span>
+            <span class="nav-label">流量监控</span>
+          </div>
+          <div class="nav-item">
+            <span class="nav-icon">
+              <svg viewBox="0 0 24 24">
+                <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+              </svg>
+            </span>
+            <span class="nav-label">规则配置</span>
+          </div>
+          <div class="nav-item">
+            <span class="nav-icon">
+              <svg viewBox="0 0 24 24">
+                <path d="M12 3l8 4v5c0 5-3.4 8.5-8 9-4.6-.5-8-4-8-9V7l8-4z" />
+              </svg>
+            </span>
+            <span class="nav-label">证书管理</span>
+          </div>
+          <div class="nav-item">
+            <span class="nav-icon">
+              <svg viewBox="0 0 24 24">
+                <path d="M4 7h16M7 12h10M10 17h4" />
+              </svg>
+            </span>
+            <span class="nav-label">代理设置</span>
+          </div>
+          <div class="nav-item">
+            <span class="nav-icon">
+              <svg viewBox="0 0 24 24">
+                <path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5z" />
+                <path
+                  d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 1.55V21a2 2 0 0 1-4 0v-.08A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 0 1 0-4h.08A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.08A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.2.63.78 1.06 1.55 1.06H21a2 2 0 0 1 0 4h-.08A1.7 1.7 0 0 0 19.4 15z"
+                />
+              </svg>
+            </span>
+            <span class="nav-label">应用设置</span>
+          </div>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="mini-label">Runtime</div>
+          <div class="health">
+            <span>127.0.0.1:8080</span>
+            <span class="dot"></span>
+          </div>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div class="page-title">
+            <h1>流量监控</h1>
+            <p>捕获 HTTP/HTTPS 会话，筛选、检查并导出 HAR 数据。</p>
+          </div>
+          <div class="top-actions">
+            <div class="status-pill"><span class="dot"></span>代理运行中</div>
+            <button class="btn">系统代理已接管</button>
+            <button class="btn primary">停止代理</button>
+          </div>
+        </header>
+
+        <section class="content">
+          <div class="main-panel">
+            <div class="toolbar">
+              <input
+                class="search"
+                value="api.flowly.local"
+                aria-label="URL 过滤"
+              />
+              <span class="chip active">GET</span>
+              <span class="chip active">POST</span>
+              <span class="chip">PATCH</span>
+              <span style="flex: 1"></span>
+              <span class="chip active">已选 3</span>
+              <button class="btn">导出 HAR</button>
+              <button class="btn">清空</button>
+            </div>
+
+            <div class="traffic-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width: 64px">方法</th>
+                    <th style="width: 78px">状态</th>
+                    <th>URL</th>
+                    <th style="width: 92px; text-align: right">大小</th>
+                    <th style="width: 88px; text-align: right">耗时</th>
+                    <th style="width: 88px">时间</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr class="selected">
+                    <td><span class="method post">POST</span></td>
+                    <td><span class="code-pill ok">200</span></td>
+                    <td>
+                      <div class="url-main">api.flowly.local</div>
+                      <div class="url-muted">
+                        /v1/session/inspect?trace=active
+                      </div>
+                    </td>
+                    <td class="num">38.4K</td>
+                    <td class="num">124ms</td>
+                    <td class="meta">16:42:18</td>
+                  </tr>
+                  <tr>
+                    <td><span class="method get">GET</span></td>
+                    <td><span class="code-pill ok">304</span></td>
+                    <td>
+                      <div class="url-main">static.flowly.local</div>
+                      <div class="url-muted">/assets/app-shell.js</div>
+                    </td>
+                    <td class="num">12.7K</td>
+                    <td class="num">38ms</td>
+                    <td class="meta">16:42:16</td>
+                  </tr>
+                  <tr>
+                    <td><span class="method patch">PATCH</span></td>
+                    <td><span class="code-pill warn">429</span></td>
+                    <td>
+                      <div class="url-main">gateway.internal</div>
+                      <div class="url-muted">/rate-limit/policy</div>
+                    </td>
+                    <td class="num">2.1K</td>
+                    <td class="num">411ms</td>
+                    <td class="meta">16:42:11</td>
+                  </tr>
+                  <tr>
+                    <td><span class="method post">POST</span></td>
+                    <td><span class="code-pill err">502</span></td>
+                    <td>
+                      <div class="url-main">billing.service.dev</div>
+                      <div class="url-muted">/checkout/confirm</div>
+                    </td>
+                    <td class="num">0.8K</td>
+                    <td class="num">2.8s</td>
+                    <td class="meta">16:42:08</td>
+                  </tr>
+                  <tr>
+                    <td><span class="method get">GET</span></td>
+                    <td><span class="code-pill ok">200</span></td>
+                    <td>
+                      <div class="url-main">docs.rs</div>
+                      <div class="url-muted">/crate/hyper/latest/source</div>
+                    </td>
+                    <td class="num">74.2K</td>
+                    <td class="num">182ms</td>
+                    <td class="meta">16:41:59</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="rules-panel">
+              <div class="panel-head">
+                <div>
+                  <div class="panel-title">规则快捷概览</div>
+                  <div class="meta">
+                    规则实时保存并热应用，JSON 作为高级模式保留。
+                  </div>
+                </div>
+                <button class="btn">新增规则</button>
+              </div>
+              <div class="rule-list">
+                <div class="rule-card">
+                  <div class="rule-top">
+                    <div class="rule-name">API Header 注入</div>
+                    <div class="switch"></div>
+                  </div>
+                  <div class="meta">匹配 api.*，添加 X-Debug-Trace</div>
+                </div>
+                <div class="rule-card">
+                  <div class="rule-top">
+                    <div class="rule-name">屏蔽埋点请求</div>
+                    <div class="switch"></div>
+                  </div>
+                  <div class="meta">过滤 /analytics 与 /track</div>
+                </div>
+                <div class="rule-card">
+                  <div class="rule-top">
+                    <div class="rule-name">响应体替换</div>
+                    <div class="switch"></div>
+                  </div>
+                  <div class="meta">按 JSON Path 修改字段</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <aside class="detail-panel">
+            <div class="detail-header">
+              <div>
+                <span class="method post">POST</span>
+                <span class="code-pill ok">200</span>
+              </div>
+              <div class="detail-url">
+                https://api.flowly.local/v1/session/inspect?trace=active
+              </div>
+            </div>
+            <div class="metric-grid">
+              <div class="metric">
+                <div class="mini-label">Duration</div>
+                <div class="metric-value">124ms</div>
+              </div>
+              <div class="metric">
+                <div class="mini-label">Request</div>
+                <div class="metric-value">6.2K</div>
+              </div>
+              <div class="metric">
+                <div class="mini-label">Response</div>
+                <div class="metric-value">32.2K</div>
+              </div>
+            </div>
+            <div style="min-height: 0; overflow: hidden">
+              <div class="tabs">
+                <div class="tab active">请求</div>
+                <div class="tab">响应</div>
+                <div class="tab">时间线</div>
+              </div>
+              <div class="detail-body">
+                <div class="section-title">
+                  <span>Headers</span>
+                  <button class="copy">复制</button>
+                </div>
+                <pre>
+content-type: application/json
+authorization: Bearer ********
+x-debug-trace: enabled
+user-agent: Flowly/0.1</pre>
+
+                <div class="section-title">
+                  <span>Body / JSON</span>
+                  <button class="copy">复制</button>
+                </div>
+                <pre>
+{
+  "sessionId": "sess_29f4c8",
+  "mode": "inspect",
+  "rules": ["inject-header", "trace-api"],
+  "captureBody": true
+}</pre>
+              </div>
+            </div>
+          </aside>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

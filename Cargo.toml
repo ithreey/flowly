@@ -1,0 +1,47 @@
+[package]
+name = "flowly"
+version = "0.4.2"
+authors = ["ithreey <i@ithreey.com>"]
+edition = "2021"
+description = "Good Man in the Middle: Use MITM technology to provide features like rewrite, redirect."
+readme = "README.md"
+homepage = "https://github.com/ithreey/flowly"
+repository = "https://github.com/ithreey/flowly"
+license = "MIT"
+keywords = ["proxy", "MITM"]
+exclude = [".github/", "docs/", "rules/"]
+
+[profile.release]
+strip = true
+lto = true
+opt-level = "s"
+codegen-units = 1
+
+[dependencies]
+mitm-core = { path = "crates/core", package = "flowly-core", default-features = false, features = ["h2"] }
+rule = { path = "crates/rule", package = "flowly-rule" }
+
+anyhow = "1.0"
+clap = { version = "4", features = ["derive"] }
+thiserror = "1"
+log = "0.4"
+env_logger = "0.10"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+hyper-proxy = { version = "0.9", default-features = false }
+rustls-pemfile = "1.0"
+tokio = { version = "1", features = ["rt-multi-thread", "signal"] }
+rustls = "0.21"
+trust_cert = { path = "crates/trust_cert", optional = true }
+
+[features]
+default = []
+trust-cert = ["dep:trust_cert"]
+js = ["rule/js"]
+
+[workspace]
+members = [
+    "crates/core",
+    "crates/rule",
+    "crates/trust_cert"
+]

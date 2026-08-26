@@ -1,0 +1,27 @@
+[package]
+name = "flowly-rule"
+version = "0.2.0"
+edition = "2021"
+description = "Use MITM technology to provide features like rewrite, redirect."
+homepage = "https://github.com/ithreey/flowly"
+repository = "https://github.com/ithreey/flowly"
+license = "MIT"
+
+[dependencies]
+mitm-core = { path = "../core", package = "flowly-core", default-features = false, features = ["h2"] }
+# mitm-core = { version = "0.2", package = "flowly-core" }
+
+anyhow = "1.0"
+async-trait = "0.1"
+cached = "0.43"
+cookie = "0.17"
+fancy-regex = "0.11"
+http = "0.2"
+hyper = { version = "0.14", features = ["client", "http1", "server", "stream", "tcp"]  }
+log = "0.4"
+quick-js = { version = "0.4", features = ["log"], optional = true }
+serde = { version = "1.0", features = ["derive"] }
+
+[features]
+default = []
+js = ["quick-js"]
