@@ -101,9 +101,11 @@
     <!-- 右键菜单 -->
     <div
       v-if="contextMenuVisible"
+      ref="contextMenuRef"
       class="context-menu"
       :style="{ left: contextMenuX + 'px', top: contextMenuY + 'px' }"
     >
+      <div class="context-menu-item" @click="replayRequest">重放请求</div>
       <div class="context-menu-item" @click="exportToHar">导出选中为 HAR</div>
       <div class="context-menu-item danger" @click="deleteSelected">
         删除选中会话
@@ -140,6 +142,9 @@ const exporting = ref(false);
 const contextMenuVisible = ref(false);
 const contextMenuX = ref(0);
 const contextMenuY = ref(0);
+const contextMenuRow = ref(null);
+const contextMenuRef = ref(null);
+const CONTEXT_MENU_MARGIN = 8;
 
 const methodOptions = [
   "GET",
@@ -258,20 +263,55 @@ function handleSelectionChange(selection) {
   selectedRows.value = selection;
 }
 
-function handleContextMenu(row, column, event) {
+async function handleContextMenu(row, column, event) {
   event.preventDefault();
+  contextMenuRow.value = row;
   if (!selectedRows.value.some((r) => r.id === row.id)) {
     tableRef.value?.toggleRowSelection(row, true);
   }
   contextMenuX.value = event.clientX;
   contextMenuY.value = event.clientY;
   contextMenuVisible.value = true;
+  await nextTick();
+  fitContextMenuInViewport();
 }
 
 // 点击其他地方关闭右键菜单
 const handleClick = () => {
   contextMenuVisible.value = false;
+  contextMenuRow.value = null;
 };
+
+async function replayRequest() {
+  const row = contextMenuRow.value;
+  if (!row) return;
+  contextMenuVisible.value = false;
+  contextMenuRow.value = null;
+  try {
+    await traffic.replay(row.id);
+    ElMessage.success("已重放请求");
+  } catch (e) {
+    ElMessage.error(`重放失败：${e}`);
+  }
+}
+
+function fitContextMenuInViewport() {
+  const menu = contextMenuRef.value;
+  if (!menu) return;
+
+  const rect = menu.getBoundingClientRect();
+  const maxX = window.innerWidth - rect.width - CONTEXT_MENU_MARGIN;
+  const maxY = window.innerHeight - rect.height - CONTEXT_MENU_MARGIN;
+
+  contextMenuX.value = Math.max(
+    CONTEXT_MENU_MARGIN,
+    Math.min(contextMenuX.value, maxX),
+  );
+  contextMenuY.value = Math.max(
+    CONTEXT_MENU_MARGIN,
+    Math.min(contextMenuY.value, maxY),
+  );
+}
 
 async function exportToHar() {
   if (selectedRows.value.length === 0) return;

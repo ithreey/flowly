@@ -29,6 +29,9 @@ export const useTrafficStore = defineStore("traffic", {
     async getDetailsBatch(ids) {
       return await invoke("traffic_get_batch", { ids });
     },
+    async replay(id) {
+      return await invoke("traffic_replay", { id });
+    },
     async clear() {
       await invoke("traffic_clear");
       this.list = [];

@@ -10,7 +10,11 @@ pub mod traffic;
 
 use std::sync::{Arc, RwLock};
 
-use mitm_core::handler::MitmFilter;
+use mitm_core::{
+    handler::MitmFilter,
+    http_client::{HttpClient, gen_client},
+    hyper::{Body, Request, Uri, body::to_bytes, header},
+};
 use rule::{RuleHandlerCtx, RuleHttpHandler};
 use tauri::{Emitter, Manager, PhysicalPosition, PhysicalSize, Position, Size, WindowEvent};
 
@@ -130,6 +134,7 @@ pub fn run() {
             config_set,
             traffic_get,
             traffic_get_batch,
+            traffic_replay,
             traffic_clear,
             traffic_delete,
             rules_cmd::rules_list,
@@ -170,6 +175,114 @@ fn traffic_get_batch(
     ids: Vec<u64>,
 ) -> Result<Vec<Option<TransactionDetail>>, String> {
     Ok(state.traffic.get_batch(&ids))
+}
+
+#[tauri::command]
+async fn traffic_replay(state: tauri::State<'_, AppState>, id: u64) -> Result<u64, String> {
+    replay_traffic_request(state.traffic.clone(), id).await
+}
+
+pub async fn replay_traffic_request(traffic: SharedTraffic, id: u64) -> Result<u64, String> {
+    let detail = traffic
+        .get(id)
+        .ok_or_else(|| "会话已过期或已删除，无法重放".to_string())?;
+    let replay_id = traffic.next_id();
+    let method = detail.summary.method.clone();
+    let url = detail.summary.url.clone();
+    let host = detail.summary.host.clone();
+    let req_headers = sanitize_replay_headers(&detail.req_headers);
+    let req_body = detail.req_body.clone();
+    let request_body = req_body.clone().unwrap_or_default();
+    let req_ct = req_headers
+        .iter()
+        .find(|(name, _)| name.eq_ignore_ascii_case("content-type"))
+        .map(|(_, value)| value.clone());
+
+    traffic.begin_request(
+        replay_id,
+        method.clone(),
+        url.clone(),
+        host,
+        req_headers.clone(),
+        req_body,
+        request_body.len(),
+        req_ct,
+    );
+
+    let uri: Uri = url.parse().map_err(|e| format!("URL 无效，无法重放：{e}"))?;
+    let mut builder = Request::builder().method(method.as_str()).uri(uri);
+    for (name, value) in &req_headers {
+        builder = builder.header(name.as_str(), value.as_str());
+    }
+    let request = builder
+        .body(Body::from(request_body))
+        .map_err(|e| format!("构造重放请求失败：{e}"))?;
+    let client = gen_client(None).map_err(|e| format!("创建重放客户端失败：{e}"))?;
+    let response = match client {
+        HttpClient::Https(client) => client
+            .request(request)
+            .await
+            .map_err(|e| format!("重放请求失败：{e}"))?,
+        HttpClient::Proxy(_) => return Err("重放客户端初始化异常".to_string()),
+    };
+
+    let (parts, body) = response.into_parts();
+    let res_ct = parts
+        .headers
+        .get(header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .map(String::from);
+    let res_headers = parts
+        .headers
+        .iter()
+        .map(|(k, v)| {
+            (
+                k.as_str().to_string(),
+                v.to_str().unwrap_or_default().to_string(),
+            )
+        })
+        .collect();
+    let bytes = to_bytes(body)
+        .await
+        .map_err(|e| format!("读取重放响应失败：{e}"))?;
+    let res_size = bytes.len();
+    let res_body = String::from_utf8(bytes.to_vec()).ok();
+
+    traffic.complete(
+        replay_id,
+        parts.status.as_u16(),
+        res_ct,
+        res_headers,
+        res_body,
+        res_size,
+        false,
+    );
+
+    Ok(replay_id)
+}
+
+fn sanitize_replay_headers(headers: &[(String, String)]) -> Vec<(String, String)> {
+    headers
+        .iter()
+        .filter(|(name, _)| !is_hop_by_hop_replay_header(name))
+        .cloned()
+        .collect()
+}
+
+fn is_hop_by_hop_replay_header(name: &str) -> bool {
+    matches!(
+        name.to_ascii_lowercase().as_str(),
+        "connection"
+            | "keep-alive"
+            | "proxy-authenticate"
+            | "proxy-authorization"
+            | "te"
+            | "trailer"
+            | "transfer-encoding"
+            | "upgrade"
+            | "host"
+            | "content-length"
+    )
 }
 
 #[tauri::command]

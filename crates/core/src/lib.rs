@@ -15,7 +15,7 @@ pub use tokio_rustls;
 mod ca;
 mod error;
 pub mod handler;
-mod http_client;
+pub mod http_client;
 pub mod mitm;
 mod sni_reader;
 
