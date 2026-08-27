@@ -26,22 +26,22 @@
             <el-switch
               :model-value="row.enabled !== false"
               size="small"
-              @change="(val) => toggleEnabled($index, val)"
+              @change="val => toggleEnabled($index, val)"
             />
           </template>
         </el-table-column>
-        <el-table-column label="规则" min-width="220">
+        <el-table-column label="规则" min-width="160">
           <template #default="{ row }">
             <div class="rule-name">{{ row.name }}</div>
             <div class="rule-meta">{{ row.summary }}</div>
           </template>
         </el-table-column>
-        <el-table-column label="匹配" min-width="220">
+        <el-table-column label="匹配" min-width="160">
           <template #default="{ row }">
             <span class="rule-chip">{{ row.matchText }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="动作" min-width="220">
+        <el-table-column label="动作" min-width="150">
           <template #default="{ row }">
             <span class="rule-chip accent">{{ row.actionText }}</span>
           </template>
@@ -91,7 +91,7 @@
         :style="{
           height: '420px',
           border: '1px solid rgba(126, 161, 196, 0.28)',
-          borderRadius: '6px',
+          borderRadius: '6px'
         }"
         :extensions="[...extensions, editorTheme]"
         :autofocus="true"
@@ -117,28 +117,28 @@ const extensions = [json()];
 const editorTheme = EditorView.theme({
   "&": {
     color: "#d8e5f2",
-    backgroundColor: "#0b1627",
+    backgroundColor: "#0b1627"
   },
   ".cm-content": {
     caretColor: "#55c7ff",
-    padding: "12px 0",
+    padding: "12px 0"
   },
   ".cm-gutters": {
     border: "none",
     backgroundColor: "#0b1627",
     color: "#647892",
-    paddingRight: "8px",
+    paddingRight: "8px"
   },
   ".cm-activeLine, .cm-activeLineGutter": {
-    backgroundColor: "rgba(79, 157, 210, 0.08)",
+    backgroundColor: "rgba(79, 157, 210, 0.08)"
   },
   ".cm-selectionBackground, &.cm-focused .cm-selectionBackground": {
-    backgroundColor: "rgba(85, 199, 255, 0.18)",
+    backgroundColor: "rgba(85, 199, 255, 0.18)"
   },
   ".cm-scroller": {
     fontFamily: "'JetBrains Mono', 'Cascadia Code', Consolas, monospace",
-    lineHeight: "1.65",
-  },
+    lineHeight: "1.65"
+  }
 });
 const formVisible = ref(false);
 const formEditingIndex = ref(null);
@@ -153,10 +153,10 @@ const editingName = ref("");
 const editingJson = ref("");
 
 const ruleRows = computed(() =>
-  ruleStore.entries.map((entry) => ({
+  ruleStore.entries.map(entry => ({
     ...entry,
-    ...summarizeRule(entry),
-  })),
+    ...summarizeRule(entry)
+  }))
 );
 
 function summarizeRule(entry) {
@@ -167,13 +167,13 @@ function summarizeRule(entry) {
     return {
       summary: rule.enabled === false ? "已停用" : "实时生效",
       matchText: summarizeList(filters, "未配置匹配条件"),
-      actionText: summarizeList(actions, "未配置动作"),
+      actionText: summarizeList(actions, "未配置动作")
     };
   } catch {
     return {
       summary: "JSON 暂不可解析",
       matchText: "解析失败",
-      actionText: "请打开 JSON 修正",
+      actionText: "请打开 JSON 修正"
     };
   }
 }
@@ -182,7 +182,7 @@ function summarizeList(list, fallback) {
   if (!list.length) return fallback;
   return list
     .slice(0, 2)
-    .map((item) => item.type || item.kind || item.name || "custom")
+    .map(item => item.type || item.kind || item.name || "custom")
     .join(" / ");
 }
 
@@ -201,7 +201,7 @@ function onRuleSubmit({ rule, editingIndex: idx }) {
   const entry = {
     name: rule.name,
     enabled: rule.enabled !== false,
-    json,
+    json
   };
   if (idx == null) {
     ruleStore.entries.push(entry);
@@ -270,7 +270,7 @@ async function doImport() {
 }
 
 onMounted(() => {
-  ruleStore.load().catch((e) => ElMessage.error(String(e)));
+  ruleStore.load().catch(e => ElMessage.error(String(e)));
 });
 </script>
 
