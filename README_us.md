@@ -214,6 +214,10 @@ If you only need to inspect HTTP traffic, you can skip CA certificate installati
 - Before stopping the proxy, confirm that the system proxy has been restored; Flowly runs restoration logic on normal shutdown.
 - Transparent proxy is not the desktop app's default workflow; forwarding rules must be configured per operating system.
 
+## Acknowledgements
+
+Flowly is developed based on [Good-MITM](https://github.com/zu1k/Good-MITM). Thanks to the original author for the contribution.
+
 ## License
 
 Flowly is licensed under the MIT License. See [LICENSE](./LICENSE) for details.

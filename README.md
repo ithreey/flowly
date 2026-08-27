@@ -214,6 +214,10 @@ CLI 规则加载支持单个 JSON 文件或目录。目录中的规则文件会�
 - 停止代理前确认系统代理已经恢复；Flowly 会在正常停止时执行还原逻辑。
 - 透明代理不是桌面端的默认工作流，需要根据操作系统自行配置转发规则。
 
+## 致谢
+
+Flowly 基于 [Good-MITM](https://github.com/zu1k/Good-MITM) 开发，感谢原作者的贡献。
+
 ## 许可证
 
 Flowly 使用 MIT License，详见 [LICENSE](./LICENSE)。
