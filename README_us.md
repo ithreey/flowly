@@ -20,6 +20,8 @@ Flowly is a local-debugging HTTP/HTTPS proxy and MITM tool. It consists of a Rus
 - Open details to inspect request headers, response headers, request body, and response body
 - Copy URL or generate cURL commands
 - Export selected sessions as HAR files
+- Replay requests via context menu
+- Real-time session status display (pending, success, failed) with status icons and loading animation
 
 ![Request Detail Inspector](./assets/screenshot-detail-inspector.png)
 

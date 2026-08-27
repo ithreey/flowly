@@ -20,6 +20,8 @@ Flowly 是一个面向本机调试的 HTTP/HTTPS 代理与 MITM 工具。它由 
 - 打开详情查看请求头、响应头、请求体和响应体
 - 复制 URL 或生成 cURL 命令
 - 将选中的会话导出为 HAR 文件
+- 通过右键菜单重放请求
+- 实时显示会话状态（等待中、成功、失败），带有状态图标和加载动画
 
 ![请求详情检查器](./assets/screenshot-detail-inspector.png)
 
