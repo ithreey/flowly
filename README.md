@@ -1,5 +1,7 @@
 # Flowly
 
+[English](./README_us.md)
+
 Flowly 是一个面向本机调试的 HTTP/HTTPS 代理与 MITM 工具。它由 Rust 代理核心和 Tauri + Vue 桌面工作台组成，用于查看网络会话、调试请求与响应、按规则拦截流量，以及导出 HAR 数据。
 
 > 仅对你拥有或明确获授权的流量使用 MITM、请求修改和证书解密功能。
