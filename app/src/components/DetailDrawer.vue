@@ -25,15 +25,15 @@
           <div class="summary-label">Status</div>
           <div
             class="summary-value"
-            :class="statusClass(detail.summary.status)"
+            :class="statusClass(detail.summary)"
           >
-            {{ detail.summary.status ?? "-" }}
+            {{ statusText(detail.summary) }}
           </div>
         </div>
         <div class="summary-card">
           <div class="summary-label">Duration</div>
           <div class="summary-value">
-            {{ detail.summary.durationMs ?? "-" }}ms
+            {{ formatDuration(detail.summary) }}
           </div>
         </div>
         <div class="summary-card">
@@ -192,7 +192,7 @@
             </div>
             <div class="timeline-row">
               <span>总耗时</span>
-              <strong>{{ detail.summary.durationMs ?? "-" }}ms</strong>
+              <strong>{{ formatDuration(detail.summary) }}</strong>
             </div>
             <div class="timeline-bar">
               <div class="timeline-fill"></div>
@@ -274,11 +274,25 @@ function methodClass(method) {
   return "method-other";
 }
 
-function statusClass(status) {
+function statusClass(summary) {
+  if (summary.phase === "pending") return "status-pending";
+  if (summary.phase === "failed") return "status-err";
+  const status = summary.status;
   if (status == null) return "status-none";
   if (status >= 200 && status < 400) return "status-ok";
   if (status >= 400 && status < 500) return "status-warn";
   return "status-err";
+}
+
+function statusText(summary) {
+  if (summary.phase === "pending") return "等待";
+  if (summary.phase === "failed") return "失败";
+  return summary.status ?? "-";
+}
+
+function formatDuration(summary) {
+  if (summary.phase === "pending") return "-";
+  return summary.durationMs == null ? "-" : `${summary.durationMs}ms`;
 }
 
 /** 当前请求 body 的展示文本（JSON 模式下复制格式化后的内容）。 */
@@ -511,6 +525,10 @@ watch(
 
 .summary-value.status-ok {
   color: #86efac;
+}
+
+.summary-value.status-pending {
+  color: #7dd3fc;
 }
 
 .summary-value.status-warn {

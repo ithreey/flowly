@@ -69,8 +69,11 @@
         </el-table-column>
         <el-table-column label="状态" width="86">
           <template #default="{ row }">
-            <span class="status-pill-cell" :class="statusClass(row.status)">
-              {{ row.status ?? "-" }}
+            <span class="status-pill-cell" :class="statusClass(row)">
+              <el-icon class="status-icon" :class="{ spinning: row.phase === 'pending' }">
+                <component :is="statusIcon(row)" />
+              </el-icon>
+              <span>{{ statusText(row) }}</span>
             </span>
           </template>
         </el-table-column>
@@ -88,7 +91,7 @@
           </template>
         </el-table-column>
         <el-table-column label="耗时" width="92" align="right">
-          <template #default="{ row }">{{ row.durationMs ?? "-" }}ms</template>
+          <template #default="{ row }">{{ formatDuration(row) }}</template>
         </el-table-column>
         <el-table-column label="时间" width="90">
           <template #default="{ row }">{{
@@ -119,6 +122,7 @@
 <script setup>
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from "vue";
 import { ElMessage } from "element-plus";
+import { CircleCheck, CircleClose, Loading, WarningFilled } from "@element-plus/icons-vue";
 import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
@@ -169,11 +173,30 @@ const filteredList = computed(() => {
   });
 });
 
-function statusClass(status) {
+function statusClass(row) {
+  if (row.phase === "pending") return "status-pending";
+  if (row.phase === "failed") return "status-err";
+  const status = row.status;
   if (status == null) return "status-none";
   if (status >= 200 && status < 400) return "status-ok";
   if (status >= 400 && status < 500) return "status-warn";
   return "status-err";
+}
+
+function statusIcon(row) {
+  if (row.phase === "pending") return Loading;
+  if (row.phase === "failed") return CircleClose;
+  const status = row.status;
+  if (status == null) return Loading;
+  if (status >= 200 && status < 400) return CircleCheck;
+  if (status >= 400 && status < 500) return WarningFilled;
+  return CircleClose;
+}
+
+function statusText(row) {
+  if (row.phase === "pending") return "等待";
+  if (row.phase === "failed") return "失败";
+  return row.status ?? "-";
 }
 
 function methodClass(method) {
@@ -266,14 +289,16 @@ function handleSelectionChange(selection) {
 async function handleContextMenu(row, column, event) {
   event.preventDefault();
   contextMenuRow.value = row;
-  if (!selectedRows.value.some((r) => r.id === row.id)) {
-    tableRef.value?.toggleRowSelection(row, true);
-  }
   contextMenuX.value = event.clientX;
   contextMenuY.value = event.clientY;
   contextMenuVisible.value = true;
   await nextTick();
   fitContextMenuInViewport();
+}
+
+function formatDuration(row) {
+  if (row.phase === "pending") return "-";
+  return row.durationMs == null ? "-" : `${row.durationMs}ms`;
 }
 
 // 点击其他地方关闭右键菜单
@@ -314,9 +339,12 @@ function fitContextMenuInViewport() {
 }
 
 async function exportToHar() {
-  if (selectedRows.value.length === 0) return;
-
   contextMenuVisible.value = false;
+  if (selectedRows.value.length === 0) {
+    ElMessage.warning("请先勾选会话");
+    return;
+  }
+
   exporting.value = true;
 
   try {
@@ -374,8 +402,11 @@ async function clear() {
 
 async function deleteSelected() {
   const ids = selectedRows.value.map((row) => row.id);
-  if (ids.length === 0) return;
   contextMenuVisible.value = false;
+  if (ids.length === 0) {
+    ElMessage.warning("请先勾选会话");
+    return;
+  }
   try {
     await traffic.delete(ids);
     tableRef.value?.clearSelection();
@@ -565,6 +596,7 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 5px;
   height: 24px;
   min-width: 52px;
   padding: 0 8px;
@@ -572,6 +604,26 @@ onBeforeUnmount(() => {
   font-family: "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
   font-size: 12px;
   font-weight: 700;
+}
+
+.status-icon {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+}
+
+.status-icon.spinning {
+  animation: status-spin 1s linear infinite;
+}
+
+@keyframes status-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .method-get {
@@ -602,6 +654,11 @@ onBeforeUnmount(() => {
 .status-ok {
   background: rgba(34, 197, 94, 0.14);
   color: #86efac;
+}
+
+.status-pending {
+  background: rgba(56, 189, 248, 0.13);
+  color: #7dd3fc;
 }
 
 .status-warn {

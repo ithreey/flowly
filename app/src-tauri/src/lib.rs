@@ -13,7 +13,7 @@ use std::sync::{Arc, RwLock};
 use mitm_core::{
     handler::MitmFilter,
     http_client::{HttpClient, gen_client},
-    hyper::{Body, Request, Uri, body::to_bytes, header},
+    hyper::{Body, Request, Uri, body::HttpBody, body::to_bytes, header},
 };
 use rule::{RuleHandlerCtx, RuleHttpHandler};
 use tauri::{Emitter, Manager, PhysicalPosition, PhysicalSize, Position, Size, WindowEvent};
@@ -198,17 +198,6 @@ pub async fn replay_traffic_request(traffic: SharedTraffic, id: u64) -> Result<u
         .find(|(name, _)| name.eq_ignore_ascii_case("content-type"))
         .map(|(_, value)| value.clone());
 
-    traffic.begin_request(
-        replay_id,
-        method.clone(),
-        url.clone(),
-        host,
-        req_headers.clone(),
-        req_body,
-        request_body.len(),
-        req_ct,
-    );
-
     let uri: Uri = url.parse().map_err(|e| format!("URL 无效，无法重放：{e}"))?;
     let mut builder = Request::builder().method(method.as_str()).uri(uri);
     for (name, value) in &req_headers {
@@ -218,11 +207,26 @@ pub async fn replay_traffic_request(traffic: SharedTraffic, id: u64) -> Result<u
         .body(Body::from(request_body))
         .map_err(|e| format!("构造重放请求失败：{e}"))?;
     let client = gen_client(None).map_err(|e| format!("创建重放客户端失败：{e}"))?;
+
+    traffic.begin_request(
+        replay_id,
+        method.clone(),
+        url.clone(),
+        host,
+        req_headers.clone(),
+        req_body,
+        request.body().size_hint().lower() as usize,
+        req_ct,
+    );
+
     let response = match client {
-        HttpClient::Https(client) => client
-            .request(request)
-            .await
-            .map_err(|e| format!("重放请求失败：{e}"))?,
+        HttpClient::Https(client) => match client.request(request).await {
+            Ok(response) => response,
+            Err(e) => {
+                traffic.fail(replay_id);
+                return Err(format!("重放请求失败：{e}"));
+            }
+        },
         HttpClient::Proxy(_) => return Err("重放客户端初始化异常".to_string()),
     };
 
@@ -242,9 +246,13 @@ pub async fn replay_traffic_request(traffic: SharedTraffic, id: u64) -> Result<u
             )
         })
         .collect();
-    let bytes = to_bytes(body)
-        .await
-        .map_err(|e| format!("读取重放响应失败：{e}"))?;
+    let bytes = match to_bytes(body).await {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            traffic.fail(replay_id);
+            return Err(format!("读取重放响应失败：{e}"));
+        }
+    };
     let res_size = bytes.len();
     let res_body = String::from_utf8(bytes.to_vec()).ok();
 

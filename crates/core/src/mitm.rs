@@ -125,8 +125,15 @@ where
         }
 
         let res = match self.client {
-            HttpClient::Proxy(client) => client.request(req).await?,
-            HttpClient::Https(client) => client.request(req).await?,
+            HttpClient::Proxy(client) => client.request(req).await,
+            HttpClient::Https(client) => client.request(req).await,
+        };
+        let res = match res {
+            Ok(res) => res,
+            Err(err) => {
+                self.http_handler.handle_error(&mut ctx).await;
+                return Err(err);
+            }
         };
 
         let mut res = self.http_handler.handle_response(&mut ctx, res).await;

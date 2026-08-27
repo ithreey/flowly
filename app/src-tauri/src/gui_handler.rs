@@ -318,4 +318,11 @@ impl HttpHandler<RuleHandlerCtx> for GuiHandler {
         }
         res
     }
+
+    async fn handle_error(&self, ctx: &mut HttpContext<RuleHandlerCtx>) {
+        let id = ctx.custom_data.request_id;
+        if id != 0 {
+            self.traffic.fail(id);
+        }
+    }
 }

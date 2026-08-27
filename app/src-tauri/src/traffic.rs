@@ -29,6 +29,7 @@ pub struct TrafficSummary {
     pub method: String,
     pub url: String,
     pub host: String,
+    pub phase: TrafficPhase,
     pub status: Option<u16>,
     pub content_type: Option<String>,
     pub req_size: usize,
@@ -38,6 +39,14 @@ pub struct TrafficSummary {
     pub started_at: u128,
     /// body 超过上限被截断，或请求阶段被短路时标记。
     pub truncated: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum TrafficPhase {
+    Pending,
+    Completed,
+    Failed,
 }
 
 /// 完整事务（含请求/响应 headers 与 body），按 id 拉取。
@@ -107,6 +116,7 @@ impl SharedTraffic {
             method,
             url,
             host,
+            phase: TrafficPhase::Pending,
             status: None,
             content_type,
             req_size,
@@ -125,6 +135,7 @@ impl SharedTraffic {
                 res_body: None,
             },
         );
+        self.upsert_summary(summary);
     }
 
     /// 响应阶段：补全事务，写入摘要环并广播。
@@ -145,6 +156,7 @@ impl SharedTraffic {
         let now = now_unix_millis();
 
         detail.summary.status = Some(status);
+        detail.summary.phase = TrafficPhase::Completed;
         detail.summary.content_type = content_type.or(detail.summary.content_type);
         detail.summary.res_size = res_size;
         detail.summary.duration_ms = now.saturating_sub(start);
@@ -154,15 +166,36 @@ impl SharedTraffic {
 
         let summary = detail.summary.clone();
         self.transactions.insert(id, detail);
+        self.upsert_summary(summary);
+    }
 
-        // 摘要环（上限 SUMMARY_RING_CAP）
+    pub fn fail(&self, id: u64) {
+        let Some(mut detail) = self.transactions.get(&id) else {
+            return;
+        };
+        let start = detail.summary.started_at;
+        let now = now_unix_millis();
+
+        detail.summary.phase = TrafficPhase::Failed;
+        detail.summary.duration_ms = now.saturating_sub(start);
+
+        let summary = detail.summary.clone();
+        self.transactions.insert(id, detail);
+        self.upsert_summary(summary);
+    }
+
+    fn upsert_summary(&self, summary: TrafficSummary) {
         let mut ring = self.summaries.write().unwrap();
-        if ring.len() >= SUMMARY_RING_CAP {
+        if let Some(existing) = ring.iter_mut().find(|item| item.id == summary.id) {
+            *existing = summary.clone();
+        } else if ring.len() >= SUMMARY_RING_CAP {
             if let Some(expired) = ring.pop_front() {
                 self.transactions.invalidate(&expired.id);
             }
+            ring.push_back(summary.clone());
+        } else {
+            ring.push_back(summary.clone());
         }
-        ring.push_back(summary.clone());
         drop(ring);
 
         let _ = self.tx.send(summary);
@@ -291,5 +324,50 @@ pub async fn read_body(
             (hyper::Body::from(bytes), Some(text), size, false)
         }
         Err(_) => (hyper::Body::empty(), None, 0, false),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn begin_request_lists_pending_and_complete_updates_same_summary() {
+        let traffic = SharedTraffic::new();
+        let id = traffic.next_id();
+
+        traffic.begin_request(
+            id,
+            "GET".to_string(),
+            "http://example.test/path".to_string(),
+            "example.test".to_string(),
+            Vec::new(),
+            None,
+            0,
+            None,
+        );
+
+        let list = traffic.list(100, 0);
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].id, id);
+        assert_eq!(list[0].phase, TrafficPhase::Pending);
+        assert_eq!(list[0].status, None);
+
+        traffic.complete(
+            id,
+            200,
+            Some("text/plain".to_string()),
+            Vec::new(),
+            Some("ok".to_string()),
+            2,
+            false,
+        );
+
+        let list = traffic.list(100, 0);
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].id, id);
+        assert_eq!(list[0].phase, TrafficPhase::Completed);
+        assert_eq!(list[0].status, Some(200));
+        assert_eq!(list[0].res_size, 2);
     }
 }

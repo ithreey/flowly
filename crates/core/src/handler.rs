@@ -27,6 +27,8 @@ pub trait HttpHandler<D: CustomContextData>: Clone + Send + Sync + 'static {
     ) -> Response<Body> {
         res
     }
+
+    async fn handle_error(&self, _ctx: &mut HttpContext<D>) {}
 }
 
 #[derive(Clone, Default)]

@@ -16,7 +16,14 @@ export const useTrafficStore = defineStore("traffic", {
       this.listening = true;
       await listen("traffic://batch", (event) => {
         const batch = event.payload || [];
-        this.list.push(...batch);
+        for (const item of batch) {
+          const index = this.list.findIndex((current) => current.id === item.id);
+          if (index >= 0) {
+            this.list.splice(index, 1, item);
+          } else {
+            this.list.push(item);
+          }
+        }
         if (this.list.length > MAX_ITEMS) {
           this.list.splice(0, this.list.length - MAX_ITEMS);
         }
