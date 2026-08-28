@@ -11,7 +11,7 @@ export const useSenderStore = defineStore("sender", {
     bodyType: "none",
     body: "",
     bodyRawFormat: "Text",
-    throughProxy: true,
+    throughProxy: false,
 
     // 当前响应
     response: null,

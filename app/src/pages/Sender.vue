@@ -2,8 +2,12 @@
   <div class="sender-page">
     <HistoryPanel class="sender-sidebar" />
     <div class="sender-main">
-      <RequestBuilder @send="store.send()" />
-      <ResponseViewer />
+      <div class="sender-request">
+        <RequestBuilder @send="store.send()" />
+      </div>
+      <div class="sender-response">
+        <ResponseViewer />
+      </div>
     </div>
   </div>
 </template>
@@ -35,5 +39,12 @@ const store = useSenderStore();
   padding: 16px;
   min-width: 0;
   overflow-y: auto;
+}
+.sender-request {
+  flex: 0 0 auto;
+}
+.sender-response {
+  flex: 1;
+  min-height: 200px;
 }
 </style>

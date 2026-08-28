@@ -21,12 +21,9 @@
     <el-tabs v-if="store.response" v-model="activeTab" class="response-tabs">
       <el-tab-pane label="Body" name="body">
         <div class="body-sub-tabs">
-          <el-radio-group v-model="bodyView" size="small">
-            <el-radio-button value="pretty">Pretty</el-radio-button>
-            <el-radio-button value="raw">Raw</el-radio-button>
-          </el-radio-group>
+          <el-checkbox v-model="prettyEnabled" size="small">Pretty</el-checkbox>
         </div>
-        <div v-if="bodyView === 'pretty'" class="body-content">
+        <div v-if="prettyEnabled" class="body-content">
           <codemirror
             :model-value="prettyBody"
             :style="{ height: '100%', fontSize: '13px' }"
@@ -69,7 +66,7 @@ import { useSenderStore } from "../stores/sender";
 
 const store = useSenderStore();
 const activeTab = ref("body");
-const bodyView = ref("pretty");
+const prettyEnabled = ref(true);
 
 const statusTagType = computed(() => {
   const s = store.response?.status;
@@ -132,8 +129,6 @@ function formatSize(bytes) {
 .response-viewer {
   display: flex;
   flex-direction: column;
-  flex: 1;
-  min-height: 0;
 }
 .response-status-bar {
   display: flex;
@@ -142,6 +137,7 @@ function formatSize(bytes) {
   padding: 8px 0;
   border-bottom: 1px solid var(--gm-line);
   margin-bottom: 8px;
+  flex-shrink: 0;
 }
 .response-label {
   font-size: 13px;
@@ -171,12 +167,12 @@ function formatSize(bytes) {
     transform: rotate(360deg);
   }
 }
-.response-tabs {
-  flex: 1;
-  min-height: 0;
+.response-tabs :deep(.el-tabs__header) {
+  margin-bottom: 8px;
 }
 .body-sub-tabs {
   margin-bottom: 8px;
+  flex-shrink: 0;
 }
 .body-content {
   border: 1px solid var(--gm-line);

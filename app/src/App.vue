@@ -13,10 +13,6 @@
           <el-icon><Odometer /></el-icon>
           <span>流量监控</span>
         </el-menu-item>
-        <el-menu-item index="/sender">
-          <el-icon><Promotion /></el-icon>
-          <span>发送器</span>
-        </el-menu-item>
         <el-menu-item index="/rules">
           <el-icon><Document /></el-icon>
           <span>规则配置</span>
@@ -32,6 +28,10 @@
         <el-menu-item index="/app-settings">
           <el-icon><Tools /></el-icon>
           <span>应用设置</span>
+        </el-menu-item>
+        <el-menu-item index="/sender">
+          <el-icon><Promotion /></el-icon>
+          <span>发送器</span>
         </el-menu-item>
       </el-menu>
       <div class="runtime-card">
@@ -514,6 +514,18 @@ body::before {
 
 .el-textarea__inner::placeholder {
   color: rgba(101, 116, 138, 0.5);
+}
+
+/* CodeMirror 行号区域适配深色主题 */
+.cm-gutters {
+  background: rgba(15, 27, 45, 0.9) !important;
+  border-right: 1px solid var(--gm-line) !important;
+}
+.cm-lineNumbers .cm-activeLineGutter {
+  background: rgba(56, 189, 248, 0.1) !important;
+}
+.cm-lineNumbers {
+  color: var(--gm-subtle) !important;
 }
 
 .el-select__selection {

@@ -20,12 +20,12 @@ pub struct SendResponse {
 
 #[tauri::command]
 pub async fn send_request(
-    state: tauri::State<'_, AppState>,
+    _state: tauri::State<'_, AppState>,
     method: String,
     url: String,
     headers: Vec<(String, String)>,
     body: Option<Vec<u8>>,
-    through_proxy: bool,
+    _through_proxy: bool,
 ) -> Result<SendResponse, String> {
     let uri: Uri = url.parse().map_err(|e| format!("URL 无效: {e}"))?;
 
@@ -37,23 +37,9 @@ pub async fn send_request(
         .body(Body::from(body.unwrap_or_default()))
         .map_err(|e| format!("构造请求失败: {e}"))?;
 
-    let client = if through_proxy {
-        let proxy_addr = {
-            let guard = state.proxy.lock().unwrap();
-            guard
-                .as_ref()
-                .map(|h| h.listen_addr.clone())
-                .ok_or_else(|| "代理未启动，无法经过代理发送。请先启动代理或取消勾选。".to_string())?
-        };
-        let proxy_uri: Uri = format!("http://{proxy_addr}")
-            .parse()
-            .map_err(|e| format!("代理地址无效: {e}"))?;
-        let proxy =
-            flowly::hyper_proxy::Proxy::new(flowly::hyper_proxy::Intercept::All, proxy_uri);
-        gen_client(Some(proxy)).map_err(|e| format!("创建代理客户端失败: {e}"))?
-    } else {
-        gen_client(None).map_err(|e| format!("创建客户端失败: {e}"))?
-    };
+    // 始终使用直连客户端（信任所有证书）。
+    // 代理路由需要 CONNECT 隧道支持，后续完善。
+    let client = gen_client(None).map_err(|e| format!("创建客户端失败: {e}"))?;
 
     let start = Instant::now();
     let response = match client {
@@ -61,10 +47,7 @@ pub async fn send_request(
             .request(request)
             .await
             .map_err(|e| format!("请求失败: {e}"))?,
-        HttpClient::Proxy(c) => c
-            .request(request)
-            .await
-            .map_err(|e| format!("请求失败: {e}"))?,
+        HttpClient::Proxy(_) => return Err("代理模式暂不支持".to_string()),
     };
     let duration_ms = start.elapsed().as_millis() as u64;
 
