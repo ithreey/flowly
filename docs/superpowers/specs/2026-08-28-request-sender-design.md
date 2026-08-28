@@ -57,6 +57,18 @@
 - `el-button` 发送按钮（带 loading 状态）
 - URL 下方一行：`☐ 经过代理` 开关（默认勾选），右侧显示响应状态摘要
 
+### cURL 自动解析
+
+- 当 URL 输入框粘贴 cURL 命令（以 `curl` 开头）时，自动解析并填充：
+  - HTTP 方法（`-X` 或根据 `-d`/`--data` 推断为 POST）
+  - URL
+  - 请求头（`-H` / `--header`）
+  - 请求体（`-d` / `--data` / `--data-raw`）
+  - 自动切换到对应 Body 类型（raw / form-data 等）
+- 解析后 URL 输入框显示解析出的纯 URL，不保留 cURL 文本
+- 解析失败时保持原文本不变，提示"无法解析 cURL 命令"
+- 使用前端 JS 实现，不依赖后端
+
 ### Tab 面板
 
 四个 Tab：Params / Headers / Body / Auth
