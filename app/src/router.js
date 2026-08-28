@@ -1,5 +1,6 @@
 import { createRouter, createWebHashHistory } from "vue-router";
 import Monitor from "./pages/Monitor.vue";
+import Sender from "./pages/Sender.vue";
 import Rules from "./pages/Rules.vue";
 import Certificates from "./pages/Certificates.vue";
 import Settings from "./pages/Settings.vue";
@@ -11,6 +12,7 @@ const router = createRouter({
   routes: [
     { path: "/", redirect: "/monitor" },
     { path: "/monitor", component: Monitor, meta: { title: "流量监控" } },
+    { path: "/sender", component: Sender, meta: { title: "发送器" } },
     { path: "/rules", component: Rules, meta: { title: "规则配置" } },
     { path: "/certs", component: Certificates, meta: { title: "证书管理" } },
     { path: "/settings", component: Settings, meta: { title: "代理设置" } },

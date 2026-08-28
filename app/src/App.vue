@@ -13,6 +13,10 @@
           <el-icon><Odometer /></el-icon>
           <span>流量监控</span>
         </el-menu-item>
+        <el-menu-item index="/sender">
+          <el-icon><Promotion /></el-icon>
+          <span>发送器</span>
+        </el-menu-item>
         <el-menu-item index="/rules">
           <el-icon><Document /></el-icon>
           <span>规则配置</span>
@@ -89,6 +93,7 @@ import {
   Document,
   Lock,
   Odometer,
+  Promotion,
   Setting,
   Tools,
 } from "@element-plus/icons-vue";
@@ -106,6 +111,7 @@ let statusTimer = null;
 
 const pageDescriptions = {
   "/monitor": "捕获 HTTP/HTTPS 会话，筛选、检查并导出 HAR 数据。",
+  "/sender": "构造和发送 HTTP 请求，调试 API 接口。",
   "/rules": "管理实时生效的流量匹配、过滤和修改规则。",
   "/certs": "生成、安装和复制用于 HTTPS 解密的 CA 证书。",
   "/settings": "配置监听地址、上游代理和系统代理接管策略。",
