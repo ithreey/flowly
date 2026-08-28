@@ -32,6 +32,10 @@ pub struct AppState {
     pub ca_path: PathBuf,
     /// 配置持久化文件（config.json）。
     pub config_path: PathBuf,
+    /// 历史记录持久化文件（history.json）。
+    pub history_path: PathBuf,
+    /// 发送器历史记录。
+    pub history: crate::history::HistoryStore,
 }
 
 /// 加载或生成 CA 证书，写入 `app_data_dir/ca/`。

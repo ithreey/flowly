@@ -1,6 +1,7 @@
 pub mod cert_cmd;
 pub mod config;
 pub mod gui_handler;
+pub mod history;
 pub mod intercept;
 mod proxy_ctrl;
 mod rules_cmd;
@@ -31,6 +32,7 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let rules_path = data_dir.join("rules.json");
     let ca_path = data_dir.join("ca");
     let config_path = data_dir.join("config.json");
+    let history_path = data_dir.join("history.json");
 
     // 从 config.json 加载配置（文件不存在时用默认值）。
     let has_global_mitm_config = config::has_mitm_hosts_config(&config_path);
@@ -73,6 +75,8 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     // broadcast → 前端事件桥接。
     spawn_traffic_bridge(app.handle().clone(), traffic.subscribe());
 
+    let history = history::HistoryStore::new(&history_path);
+
     app.manage(AppState {
         proxy: std::sync::Mutex::new(None),
         ca: std::sync::Mutex::new(ca),
@@ -84,6 +88,8 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         rules_path,
         ca_path,
         config_path,
+        history_path,
+        history,
     });
 
     Ok(())
@@ -153,6 +159,10 @@ pub fn run() {
             cert_cmd::cert_get_pem,
             cert_cmd::cert_install_trust,
             intercept::intercept_decide,
+            history::history_list,
+            history::history_save,
+            history::history_clear,
+            history::history_delete,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
