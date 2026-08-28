@@ -1,12 +1,11 @@
 use std::time::Instant;
+use tokio::time::{timeout, Duration};
 
 use mitm_core::{
     http_client::{gen_client, HttpClient},
     hyper::{body::to_bytes, Body, Request, Uri},
 };
 use serde::Serialize;
-
-use crate::state::AppState;
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,12 +19,10 @@ pub struct SendResponse {
 
 #[tauri::command]
 pub async fn send_request(
-    _state: tauri::State<'_, AppState>,
     method: String,
     url: String,
     headers: Vec<(String, String)>,
     body: Option<Vec<u8>>,
-    _through_proxy: bool,
 ) -> Result<SendResponse, String> {
     let uri: Uri = url.parse().map_err(|e| format!("URL 无效: {e}"))?;
 
@@ -43,9 +40,9 @@ pub async fn send_request(
 
     let start = Instant::now();
     let response = match client {
-        HttpClient::Https(c) => c
-            .request(request)
+        HttpClient::Https(c) => timeout(Duration::from_secs(30), c.request(request))
             .await
+            .map_err(|_| "请求超时（30s）".to_string())?
             .map_err(|e| format!("请求失败: {e}"))?,
         HttpClient::Proxy(_) => return Err("代理模式暂不支持".to_string()),
     };
@@ -62,8 +59,9 @@ pub async fn send_request(
             )
         })
         .collect();
-    let bytes = to_bytes(body)
+    let bytes = timeout(Duration::from_secs(30), to_bytes(body))
         .await
+        .map_err(|_| "读取响应超时（30s）".to_string())?
         .map_err(|e| format!("读取响应失败: {e}"))?;
 
     let status_text = parts

@@ -1,17 +1,22 @@
 import { defineStore } from "pinia";
 import { invoke } from "@tauri-apps/api/core";
 
+const SKIPPED_REQUEST_HEADERS = new Set([
+  "if-none-match",
+  "if-modified-since",
+]);
+
 export const useSenderStore = defineStore("sender", {
   state: () => ({
     // 当前请求
     method: "GET",
     url: "",
     params: [],
+    formRows: [],
     headers: [{ key: "Accept", value: "*/*", enabled: true }],
     bodyType: "none",
     body: "",
     bodyRawFormat: "Text",
-    throughProxy: false,
 
     // 当前响应
     response: null,
@@ -27,13 +32,13 @@ export const useSenderStore = defineStore("sender", {
       this.method = req.method || "GET";
       this.url = req.url || "";
       this.params = req.params || [];
+      this.formRows = req.formRows || [];
       this.headers = req.headers || [
         { key: "Accept", value: "*/*", enabled: true },
       ];
       this.bodyType = req.bodyType || "none";
       this.body = req.body || "";
       this.bodyRawFormat = req.bodyRawFormat || "Text";
-      this.throughProxy = req.throughProxy ?? true;
     },
 
     async send() {
@@ -43,10 +48,7 @@ export const useSenderStore = defineStore("sender", {
 
       const finalUrl = this._buildUrl();
       const reqHeaders = this._buildHeaders();
-      const bodyBytes =
-        this.bodyType !== "none" && this.body
-          ? [...new TextEncoder().encode(this.body)]
-          : null;
+      const bodyBytes = this._buildBodyBytes();
 
       try {
         const resp = await invoke("send_request", {
@@ -54,32 +56,30 @@ export const useSenderStore = defineStore("sender", {
           url: finalUrl,
           headers: reqHeaders,
           body: bodyBytes,
-          throughProxy: this.throughProxy,
         });
 
         this.response = {
+          url: finalUrl,
           status: resp.status,
           statusText: resp.statusText,
           headers: resp.headers,
-          body: new TextDecoder().decode(new Uint8Array(resp.body)),
+          bodyBytes: resp.body, // 保持原始字节数组
           durationMs: resp.durationMs,
           size: resp.body.length,
         };
 
-        // 保存到历史
+        // 保存到历史（只存请求，不存响应）
         await invoke("history_save", {
           entry: {
             id: 0,
             method: this.method,
             url: finalUrl,
+            params: this.params,
+            formRows: this.formRows,
             headers: reqHeaders,
+            bodyType: this.bodyType,
+            bodyRawFormat: this.bodyRawFormat,
             body: bodyBytes,
-            throughProxy: this.throughProxy,
-            status: resp.status,
-            statusText: resp.statusText,
-            responseHeaders: resp.headers,
-            responseBody: resp.body,
-            durationMs: resp.durationMs,
             timestamp: Date.now(),
           },
         });
@@ -113,27 +113,21 @@ export const useSenderStore = defineStore("sender", {
       this.setRequest({
         method: entry.method,
         url: entry.url,
+        params: entry.params || [],
         headers: (entry.headers || []).map(([key, value]) => ({
           key,
           value,
           enabled: true,
         })),
-        bodyType: entry.body ? "raw" : "none",
+        formRows: entry.formRows || [],
+        bodyType: entry.bodyType || (entry.body ? "raw" : "none"),
         body: entry.body
           ? new TextDecoder().decode(new Uint8Array(entry.body))
           : "",
-        throughProxy: entry.throughProxy,
+        bodyRawFormat: entry.bodyRawFormat,
       });
-      this.response = {
-        status: entry.status,
-        statusText: entry.statusText,
-        headers: entry.responseHeaders || [],
-        body: entry.responseBody
-          ? new TextDecoder().decode(new Uint8Array(entry.responseBody))
-          : "",
-        durationMs: entry.durationMs,
-        size: entry.responseBody?.length || 0,
-      };
+      // 历史只存请求，响应需重新发送
+      this.response = null;
     },
 
     _buildUrl() {
@@ -153,7 +147,12 @@ export const useSenderStore = defineStore("sender", {
 
     _buildHeaders() {
       const headers = this.headers
-        .filter((h) => h.enabled && h.key)
+        .filter(
+          (h) =>
+            h.enabled &&
+            h.key &&
+            !SKIPPED_REQUEST_HEADERS.has(h.key.trim().toLowerCase())
+        )
         .map((h) => [h.key, h.value]);
 
       if (this.bodyType === "raw" && this.bodyRawFormat !== "Text") {
@@ -180,6 +179,27 @@ export const useSenderStore = defineStore("sender", {
       }
 
       return headers;
+    },
+
+    _buildBodyBytes() {
+      if (this.bodyType === "none") return null;
+
+      if (this.bodyType === "x-www-form-urlencoded") {
+        const qs = this.formRows
+          .filter((r) => r.enabled && r.key)
+          .map(
+            (r) =>
+              `${encodeURIComponent(r.key)}=${encodeURIComponent(r.value)}`
+          )
+          .join("&");
+        return qs ? [...new TextEncoder().encode(qs)] : null;
+      }
+
+      if (this.bodyType === "raw" && this.body) {
+        return [...new TextEncoder().encode(this.body)];
+      }
+
+      return null;
     },
   },
 });

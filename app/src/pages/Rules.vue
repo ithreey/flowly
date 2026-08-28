@@ -76,7 +76,7 @@
     <!-- HTTPS 解密域名设置 -->
     <el-dialog v-model="mitmVisible" title="HTTPS 解密域名" width="560px">
       <div class="mitm-dialog-subtitle">
-        配置需要解密的 HTTPS 域名，一行一个，为空则解密所有域名
+        配置需要解密的 HTTPS 域名，一行一个。支持 *、*.example.com、api.example.com。为空则解密所有域名。
       </div>
       <el-input
         v-model="mitmText"

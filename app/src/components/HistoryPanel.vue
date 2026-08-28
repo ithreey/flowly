@@ -38,12 +38,6 @@
           <span class="item-url" :title="item.url">{{
             extractPath(item.url)
           }}</span>
-          <div class="item-meta">
-            <span class="item-status" :class="statusClass(item.status)">{{
-              item.status
-            }}</span>
-            <span class="item-time">{{ item.durationMs }}ms</span>
-          </div>
         </div>
       </template>
       <div v-if="filteredGroups.length === 0" class="history-empty">
@@ -132,13 +126,6 @@ function extractPath(url) {
   }
 }
 
-function statusClass(status) {
-  if (status >= 200 && status < 300) return "status-ok";
-  if (status >= 300 && status < 400) return "status-redirect";
-  if (status >= 400 && status < 500) return "status-warn";
-  return "status-err";
-}
-
 function showContextMenu(event, item) {
   ctxMenu.value = { visible: true, x: event.clientX, y: event.clientY, item };
 }
@@ -157,7 +144,8 @@ async function copyAsCurl() {
     body: item.body
       ? new TextDecoder().decode(new Uint8Array(item.body))
       : "",
-    bodyType: item.body ? "raw" : "none",
+    bodyType: item.bodyType || (item.body ? "raw" : "none"),
+    formRows: item.formRows || [],
   });
   try {
     await navigator.clipboard.writeText(curl);
@@ -279,31 +267,6 @@ async function confirmClear() {
   white-space: nowrap;
   flex: 1;
   min-width: 0;
-}
-.item-meta {
-  display: flex;
-  gap: 6px;
-  font-size: 10px;
-  width: 100%;
-  padding-left: 36px;
-}
-.item-status {
-  font-weight: 600;
-}
-.status-ok {
-  color: #22c55e;
-}
-.status-redirect {
-  color: #38bdf8;
-}
-.status-warn {
-  color: #f59e0b;
-}
-.status-err {
-  color: #f87171;
-}
-.item-time {
-  color: var(--gm-subtle);
 }
 .history-empty {
   text-align: center;

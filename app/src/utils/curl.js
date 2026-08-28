@@ -37,10 +37,25 @@ export function parseCurl(text) {
       ) {
         data = args[++i] || "";
       } else if (arg.startsWith("-") || arg.startsWith("--")) {
-        // 跳过未知 flag 及其值
-        if (i + 1 < args.length && !args[i + 1].startsWith("-")) {
+        // 只有已知带值的 flag 才跳过下一个参数
+        const flagsWithValue = new Set([
+          "-o", "--output",
+          "-w", "--write-out",
+          "--connect-timeout",
+          "--max-time",
+          "--retry",
+          "--retry-delay",
+          "-F", "--form",
+          "--form-string",
+          "-u", "--user",
+          "--proxy-user",
+          "-x", "--proxy",
+          "-e", "--referer",
+        ]);
+        if (flagsWithValue.has(arg) && i + 1 < args.length) {
           i++;
         }
+        // 其他 flag（-L, -k, --compressed 等）不带值，不跳过
       } else if (!url) {
         url = arg;
       }

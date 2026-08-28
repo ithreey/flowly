@@ -17,7 +17,6 @@
         class="url-input"
         @paste="onPaste"
       />
-      <el-checkbox v-model="store.throughProxy" size="small" class="proxy-check">经过代理</el-checkbox>
       <el-button type="primary" size="small" :loading="store.sending" @click="$emit('send')">
         Send
       </el-button>
@@ -55,7 +54,7 @@
         <div v-if="store.bodyType === 'none'" class="body-empty">此请求没有 Body</div>
         <KeyValueTable
           v-else-if="store.bodyType === 'x-www-form-urlencoded'"
-          v-model="store.params"
+          v-model="store.formRows"
           add-label="+ 添加字段"
         />
         <div v-else-if="store.bodyType === 'raw'" class="body-editor">
@@ -73,9 +72,10 @@
           />
         </div>
       </el-tab-pane>
-      <el-tab-pane label="Auth" name="auth">
+      <!-- Auth tab 待实现后开放 -->
+      <!-- <el-tab-pane label="Auth" name="auth">
         <div class="body-empty">即将支持</div>
-      </el-tab-pane>
+      </el-tab-pane> -->
     </el-tabs>
   </div>
 </template>
@@ -167,10 +167,6 @@ function onPaste(event) {
 .method-select :deep(.el-select__wrapper) {
   background: rgba(15, 27, 45, 0.9);
   box-shadow: 0 0 0 1px var(--gm-line) inset;
-}
-.proxy-check {
-  flex-shrink: 0;
-  margin: 0 4px;
 }
 .request-tabs :deep(.el-tabs__header) {
   margin-bottom: 8px;

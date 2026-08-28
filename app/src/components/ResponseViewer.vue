@@ -31,7 +31,7 @@
             :readonly="true"
           />
         </div>
-        <pre v-else class="raw-body">{{ store.response.body }}</pre>
+        <pre v-else class="raw-body">{{ bodyText }}</pre>
       </el-tab-pane>
       <el-tab-pane label="Headers" name="headers">
         <table class="headers-table">
@@ -45,7 +45,7 @@
       </el-tab-pane>
       <el-tab-pane label="Preview" name="preview">
         <div v-if="previewType === 'html'" class="preview-frame">
-          <iframe :srcdoc="store.response.body" sandbox="" class="preview-iframe" />
+          <iframe :srcdoc="bodyText" sandbox="" class="preview-iframe" />
         </div>
         <div v-else-if="previewType === 'image'" class="preview-image">
           <img :src="imageDataUrl" alt="preview" />
@@ -57,7 +57,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, watch, onBeforeUnmount } from "vue";
 import { Loading } from "@element-plus/icons-vue";
 import { Codemirror } from "vue-codemirror";
 import { json } from "@codemirror/lang-json";
@@ -67,6 +67,7 @@ import { useSenderStore } from "../stores/sender";
 const store = useSenderStore();
 const activeTab = ref("body");
 const prettyEnabled = ref(true);
+const imageDataUrl = ref("");
 
 const statusTagType = computed(() => {
   const s = store.response?.status;
@@ -84,6 +85,21 @@ const contentType = computed(() => {
   return h ? h[1].toLowerCase() : "";
 });
 
+const bodyBytes = computed(() => store.response?.bodyBytes || []);
+const responseUrl = computed(() => store.response?.url || "");
+
+const bodyText = computed(() => {
+  const bytes = bodyBytes.value;
+  if (!bytes.length) return "";
+  try {
+    return new TextDecoder("utf-8", { fatal: false }).decode(
+      new Uint8Array(bytes)
+    );
+  } catch {
+    return "[二进制数据，无法显示为文本]";
+  }
+});
+
 const prettyExtensions = computed(() => {
   const ct = contentType.value;
   if (ct.includes("json")) return [json()];
@@ -92,30 +108,58 @@ const prettyExtensions = computed(() => {
 });
 
 const prettyBody = computed(() => {
-  const body = store.response?.body || "";
+  const text = bodyText.value;
   if (contentType.value.includes("json")) {
     try {
-      return JSON.stringify(JSON.parse(body), null, 2);
+      return JSON.stringify(JSON.parse(text), null, 2);
     } catch {
-      return body;
+      return text;
     }
   }
-  return body;
+  return text;
 });
 
 const previewType = computed(() => {
   const ct = contentType.value;
   if (ct.includes("html")) return "html";
-  if (ct.startsWith("image/")) return "image";
+  if (isImageResponse.value) return "image";
   return "none";
 });
 
-const imageDataUrl = computed(() => {
-  if (!store.response?.body) return "";
-  const ct = contentType.value;
-  const bytes = new TextEncoder().encode(store.response.body);
-  const blob = new Blob([bytes], { type: ct });
-  return URL.createObjectURL(blob);
+const isImageResponse = computed(() => {
+  if (contentType.value.startsWith("image/")) return true;
+  return /\.(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/i.test(responseUrl.value);
+});
+
+const imageContentType = computed(() => {
+  if (contentType.value.startsWith("image/")) return contentType.value;
+  const url = responseUrl.value.toLowerCase();
+  if (url.includes(".svg")) return "image/svg+xml";
+  if (url.includes(".webp")) return "image/webp";
+  if (url.includes(".gif")) return "image/gif";
+  if (url.includes(".bmp")) return "image/bmp";
+  if (url.includes(".jpg") || url.includes(".jpeg")) return "image/jpeg";
+  return "image/png";
+});
+
+watch(
+  [bodyBytes, contentType, responseUrl],
+  ([bytes]) => {
+    if (imageDataUrl.value) {
+      URL.revokeObjectURL(imageDataUrl.value);
+      imageDataUrl.value = "";
+    }
+    if (!bytes.length || !isImageResponse.value) return;
+    const blob = new Blob([new Uint8Array(bytes)], {
+      type: imageContentType.value,
+    });
+    imageDataUrl.value = URL.createObjectURL(blob);
+  },
+  { immediate: true }
+);
+
+onBeforeUnmount(() => {
+  if (imageDataUrl.value) URL.revokeObjectURL(imageDataUrl.value);
 });
 
 function formatSize(bytes) {

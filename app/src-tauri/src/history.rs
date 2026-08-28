@@ -6,19 +6,42 @@ const MAX_HISTORY: usize = 200;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct KeyValueRow {
+    pub key: String,
+    pub value: String,
+    #[serde(default = "default_enabled")]
+    pub enabled: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct HistoryEntry {
     pub id: u64,
     pub method: String,
     pub url: String,
+    #[serde(default)]
+    pub params: Vec<KeyValueRow>,
+    #[serde(default)]
+    pub form_rows: Vec<KeyValueRow>,
     pub headers: Vec<(String, String)>,
+    #[serde(default = "default_body_type")]
+    pub body_type: String,
+    #[serde(default = "default_body_raw_format")]
+    pub body_raw_format: String,
     pub body: Option<Vec<u8>>,
-    pub through_proxy: bool,
-    pub status: u16,
-    pub status_text: String,
-    pub response_headers: Vec<(String, String)>,
-    pub response_body: Option<Vec<u8>>,
-    pub duration_ms: u64,
     pub timestamp: i64,
+}
+
+fn default_enabled() -> bool {
+    true
+}
+
+fn default_body_type() -> String {
+    "none".to_string()
+}
+
+fn default_body_raw_format() -> String {
+    "Text".to_string()
 }
 
 pub struct HistoryStore {
