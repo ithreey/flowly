@@ -132,6 +132,19 @@ function tokenize(text) {
     }
 
     if (ch === "\\" && i + 1 < text.length) {
+      // `\` + 换行 = 续行，跳过反斜杠和后续空白
+      if (text[i + 1] === "\n" || text[i + 1] === "\r") {
+        i++;
+        // 跳过 \r\n 或 \n
+        if (text[i] === "\r" && i + 1 < text.length && text[i + 1] === "\n") {
+          i++;
+        }
+        // 跳过续行后的前导空白
+        while (i + 1 < text.length && /\s/.test(text[i + 1]) && text[i + 1] !== "\n" && text[i + 1] !== "\r") {
+          i++;
+        }
+        continue;
+      }
       current += text[++i];
       continue;
     }
