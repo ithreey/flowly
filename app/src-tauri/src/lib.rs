@@ -4,6 +4,7 @@ pub mod gui_handler;
 pub mod history;
 pub mod intercept;
 mod proxy_ctrl;
+pub mod sender;
 mod rules_cmd;
 mod state;
 pub mod system_proxy;
@@ -163,6 +164,7 @@ pub fn run() {
             history::history_save,
             history::history_clear,
             history::history_delete,
+            sender::send_request,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
