@@ -5,13 +5,14 @@
         <div>
           <div class="section-title">规则配置</div>
           <div class="section-subtitle">
-            规则保存后立即热应用，JSON 模式作为高级入口保留。
+            HTTPS 解密域名和规则保存后立即热应用，JSON 模式作为高级入口保留。
           </div>
         </div>
         <div class="spacer" />
         <el-button type="primary" @click="formVisible = true">
           新增规则
         </el-button>
+        <el-button @click="mitmVisible = true">HTTPS 解密域名</el-button>
         <el-button @click="openImport">导入 JSON</el-button>
       </div>
 
@@ -69,6 +70,24 @@
       <template #footer>
         <el-button @click="importVisible = false">取消</el-button>
         <el-button type="primary" @click="doImport">导入</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- HTTPS 解密域名设置 -->
+    <el-dialog v-model="mitmVisible" title="HTTPS 解密域名" width="560px">
+      <div class="mitm-dialog-subtitle">
+        配置需要解密的 HTTPS 域名，一行一个，为空则解密所有域名
+      </div>
+      <el-input
+        v-model="mitmText"
+        class="mitm-input"
+        type="textarea"
+        :rows="3"
+        placeholder="*.example.com&#10;api.example.com"
+      />
+      <template #footer>
+        <el-button @click="mitmVisible = false">取消</el-button>
+        <el-button type="primary" @click="saveMitmHosts">保存</el-button>
       </template>
     </el-dialog>
 
@@ -148,9 +167,11 @@ const ruleStore = useRuleStore();
 const importVisible = ref(false);
 const importText = ref("");
 const editVisible = ref(false);
+const mitmVisible = ref(false);
 const editingIndex = ref(-1);
 const editingName = ref("");
 const editingJson = ref("");
+const mitmText = ref("");
 
 const ruleRows = computed(() =>
   ruleStore.entries.map(entry => ({
@@ -193,6 +214,15 @@ async function applyNow() {
   } catch (e) {
     ElMessage.error(String(e));
   }
+}
+
+async function saveMitmHosts() {
+  ruleStore.mitmHosts = mitmText.value
+    .split(/\r?\n/)
+    .map(item => item.trim())
+    .filter(Boolean);
+  await applyNow();
+  mitmVisible.value = false;
 }
 
 /** 表单新增/编辑：把组装好的规则对象转成 JSON 条目加入列表（或替换对应下标）。 */
@@ -270,7 +300,12 @@ async function doImport() {
 }
 
 onMounted(() => {
-  ruleStore.load().catch(e => ElMessage.error(String(e)));
+  ruleStore
+    .load()
+    .then(() => {
+      mitmText.value = ruleStore.mitmHosts.join("\n");
+    })
+    .catch(e => ElMessage.error(String(e)));
 });
 </script>
 
@@ -299,6 +334,21 @@ onMounted(() => {
   gap: 8px;
   padding: 12px;
   border-bottom: 1px solid var(--gm-line);
+}
+
+.mitm-dialog-subtitle {
+  margin-bottom: 10px;
+  color: var(--gm-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.mitm-input :deep(.el-textarea__inner) {
+  height: 78px;
+  min-height: 78px !important;
+  max-height: 78px;
+  overflow-y: auto;
+  resize: none;
 }
 
 .spacer {

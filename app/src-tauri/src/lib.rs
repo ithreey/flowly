@@ -32,11 +32,19 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let ca_path = data_dir.join("ca");
     let config_path = data_dir.join("config.json");
 
-    let ca = state::ensure_ca(&data_dir)?;
-    let (rules, mitm_filters) = state::ensure_rules(&data_dir)?;
-
     // 从 config.json 加载配置（文件不存在时用默认值）。
+    let has_global_mitm_config = config::has_mitm_hosts_config(&config_path);
     let config: Arc<RwLock<AppConfig>> = Arc::new(RwLock::new(config::load_config(&config_path)));
+    let ca = state::ensure_ca(&data_dir)?;
+    let (rules, legacy_mitm_filters) = state::ensure_rules(&data_dir)?;
+    let mitm_filters = {
+        let cfg = config.read().unwrap();
+        if has_global_mitm_config {
+            cfg.mitm_hosts.clone()
+        } else {
+            legacy_mitm_filters
+        }
+    };
     if let Err(e) = system_proxy::clear_stale_system_proxy(&config.read().unwrap().listen_addr) {
         eprintln!("清理遗留系统代理失败: {e}");
     }

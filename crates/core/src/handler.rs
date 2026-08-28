@@ -56,6 +56,10 @@ impl<D: CustomContextData> MitmFilter<D> {
     pub async fn filter_req(&self, _ctx: &HttpContext<D>, req: &Request<Body>) -> bool {
         let host = req.uri().host().unwrap_or_default();
         let list = self.filters.read().unwrap();
+        // 列表为空时解密所有域名
+        if list.is_empty() {
+            return true;
+        }
         for m in list.iter() {
             if m.matches(host) {
                 return true;
@@ -66,6 +70,10 @@ impl<D: CustomContextData> MitmFilter<D> {
 
     pub async fn filter(&self, host: &str) -> bool {
         let list = self.filters.read().unwrap();
+        // 列表为空时解密所有域名
+        if list.is_empty() {
+            return true;
+        }
         for m in list.iter() {
             if m.matches(host) {
                 return true;

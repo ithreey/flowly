@@ -506,6 +506,10 @@ body::before {
   color: var(--gm-subtle);
 }
 
+.el-textarea__inner::placeholder {
+  color: rgba(101, 116, 138, 0.5);
+}
+
 .el-select__selection {
   min-height: 22px;
 }

@@ -113,6 +113,7 @@ async function start() {
         captureBody: cfg.captureBody ?? true,
         maxBodySize: cfg.maxBodySize,
         autoSystemProxy: autoSystemProxy.value,
+        mitmHosts: cfg.mitmHosts || [],
       },
     });
 

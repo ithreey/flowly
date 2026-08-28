@@ -11,6 +11,9 @@ pub struct AppConfig {
     pub max_body_size: usize,
     /// 启动代理时自动设置系统代理到监听地址，停止时还原。
     pub auto_system_proxy: bool,
+    /// 全局 HTTPS MITM 域名模式，一行一个，如 `*`、`*.example.com`。
+    #[serde(default)]
+    pub mitm_hosts: Vec<String>,
 }
 
 impl Default for AppConfig {
@@ -21,6 +24,7 @@ impl Default for AppConfig {
             capture_body: true,
             max_body_size: 256 * 1024,
             auto_system_proxy: true,
+            mitm_hosts: vec![],
         }
     }
 }
@@ -33,6 +37,16 @@ pub fn load_config(path: &Path) -> AppConfig {
         }
     }
     AppConfig::default()
+}
+
+pub fn has_mitm_hosts_config(path: &Path) -> bool {
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return false;
+    };
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(&content) else {
+        return false;
+    };
+    value.get("mitmHosts").is_some()
 }
 
 /// 持久化配置到 `config.json`。

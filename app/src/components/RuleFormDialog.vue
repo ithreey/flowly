@@ -12,12 +12,6 @@
       <el-form-item label="启用">
         <el-switch v-model="form.enabled" />
       </el-form-item>
-      <el-form-item label="MITM 域名">
-        <el-input
-          v-model="form.mitm"
-          placeholder="如 *.baidu.com（需要 MITM 的 HTTPS 域名，可留空）"
-        />
-      </el-form-item>
 
       <el-form-item label="筛选条件">
         <div class="list">
@@ -52,12 +46,12 @@
         <div class="list">
           <div v-for="(a, i) in form.actions" :key="i" class="row">
             <el-select v-model="a.type" size="small" class="type-select">
-              <el-option value="reject" label="拒绝(502)" />
-              <el-option value="redirect" label="重定向" />
-              <el-option value="intercept" label="拦截确认" />
-              <el-option value="logReq" label="记录请求" />
-              <el-option value="logRes" label="记录响应" />
-              <el-option value="modifyBody" label="修改响应体" />
+              <el-option
+                v-for="item in visibleActionTypes"
+                :key="item.value"
+                :value="item.value"
+                :label="item.label"
+              />
             </el-select>
             <el-input
               v-if="a.type === 'redirect'"
@@ -66,7 +60,30 @@
               class="value-input"
               placeholder="目标 URL"
             />
-            <template v-if="a.type === 'modifyBody'">
+            <template
+              v-if="
+                a.type === 'setRequestHeader' || a.type === 'setResponseHeader'
+              "
+            >
+              <el-input
+                v-model="a.key"
+                size="small"
+                class="value-input"
+                placeholder="Header 名称"
+              />
+              <el-input
+                v-model="a.value"
+                size="small"
+                class="value-input"
+                placeholder="Header 值"
+              />
+            </template>
+            <template
+              v-if="
+                a.type === 'modifyRequestBody' ||
+                a.type === 'modifyResponseBody'
+              "
+            >
               <el-input
                 v-model="a.origin"
                 size="small"
@@ -84,7 +101,9 @@
               删除
             </el-button>
           </div>
-          <el-button size="small" plain @click="addAction">+ 添加动作</el-button>
+          <el-button size="small" plain @click="addAction"
+            >+ 添加动作</el-button
+          >
         </div>
       </el-form-item>
     </el-form>
@@ -98,6 +117,13 @@
 
 <script setup>
 import { reactive, watch } from "vue";
+import {
+  createDefaultAction,
+  createDefaultForm,
+  parseActions,
+  serializeFormRule,
+  visibleActionTypes,
+} from "../utils/rule-form";
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -108,17 +134,7 @@ const props = defineProps({
 });
 const emit = defineEmits(["update:modelValue", "submit"]);
 
-function defaultForm() {
-  return {
-    name: "new rule",
-    enabled: true,
-    mitm: "",
-    filters: [{ type: "all", value: "" }],
-    actions: [{ type: "logReq" }],
-  };
-}
-
-const form = reactive(defaultForm());
+const form = reactive(createDefaultForm());
 
 // 把规则 JSON 反向解析为表单结构。
 function parseFilters(filters) {
@@ -132,40 +148,17 @@ function parseFilters(filters) {
   });
 }
 
-function parseActions(actions) {
-  if (!Array.isArray(actions)) actions = [actions];
-  return actions.map((a) => {
-    if (typeof a === "string") return { type: a };
-    if (a && typeof a === "object") {
-      if (a.redirect != null) return { type: "redirect", url: String(a.redirect) };
-      if (a.modifyResponse && a.modifyResponse.body) {
-        const b = a.modifyResponse.body;
-        if (typeof b === "string") {
-          return { type: "modifyBody", origin: "", new: b };
-        }
-        return {
-          type: "modifyBody",
-          origin: String(b.origin ?? ""),
-          new: String(b.new ?? ""),
-        };
-      }
-    }
-    return { type: "logReq" };
-  });
-}
-
 // 每次打开时填充表单（新增用默认，编辑回填）。
 watch(
   () => props.modelValue,
   (v) => {
     if (!v) return;
-    const base = defaultForm();
+    const base = createDefaultForm();
     if (props.editingIndex != null && props.initialJson) {
       try {
         const r = JSON.parse(props.initialJson);
         base.name = r.name ?? base.name;
         base.enabled = r.enabled !== false;
-        base.mitm = r.mitmList ?? r.mitm ?? "";
         base.filters = parseFilters(r.filters);
         base.actions = parseActions(r.actions);
       } catch {
@@ -173,7 +166,7 @@ watch(
       }
     }
     Object.assign(form, base);
-  }
+  },
 );
 
 function addFilter() {
@@ -183,43 +176,17 @@ function removeFilter(i) {
   form.filters.splice(i, 1);
 }
 function addAction() {
-  form.actions.push({ type: "logReq" });
+  form.actions.push(createDefaultAction());
 }
 function removeAction(i) {
   form.actions.splice(i, 1);
 }
 
-/** 把表单组装成规则的 JSON 对象。 */
-function buildRule() {
-  const rule = {
-    name: form.name.trim() || "new rule",
-    enabled: form.enabled,
-    filters: form.filters.map((f) =>
-      f.type === "all" ? { all: null } : { [f.type]: f.value }
-    ),
-    actions: form.actions.map((a) => {
-      switch (a.type) {
-        case "reject":
-          return "reject";
-        case "redirect":
-          return { redirect: a.url };
-        case "intercept":
-          return "intercept";
-        case "logReq":
-          return "logReq";
-        case "logRes":
-          return "logRes";
-        case "modifyBody":
-          return { modifyResponse: { body: { origin: a.origin, new: a.new } } };
-      }
-    }),
-  };
-  if (form.mitm.trim()) rule.mitmList = form.mitm.trim();
-  return rule;
-}
-
 function submit() {
-  emit("submit", { rule: buildRule(), editingIndex: props.editingIndex });
+  emit("submit", {
+    rule: serializeFormRule(form),
+    editingIndex: props.editingIndex,
+  });
   emit("update:modelValue", false);
 }
 </script>
