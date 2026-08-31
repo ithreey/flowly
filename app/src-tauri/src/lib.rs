@@ -48,8 +48,17 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             legacy_mitm_filters
         }
     };
-    if let Err(e) = system_proxy::clear_stale_system_proxy(&config.read().unwrap().listen_addr) {
+    let configured_listen_addr = config.read().unwrap().listen_addr.clone();
+    if let Err(e) = system_proxy::clear_stale_system_proxy(&configured_listen_addr) {
         eprintln!("清理遗留系统代理失败: {e}");
+    }
+    if let Ok(addr) = configured_listen_addr.parse() {
+        let local_system_proxy_addr = proxy_ctrl::system_proxy_addr(addr);
+        if local_system_proxy_addr != configured_listen_addr {
+            if let Err(e) = system_proxy::clear_stale_system_proxy(&local_system_proxy_addr) {
+                eprintln!("清理遗留本机系统代理失败: {e}");
+            }
+        }
     }
     let traffic = SharedTraffic::new();
 

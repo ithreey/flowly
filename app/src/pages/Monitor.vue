@@ -108,6 +108,7 @@
       class="context-menu"
       :style="{ left: contextMenuX + 'px', top: contextMenuY + 'px' }"
     >
+      <div class="context-menu-item" @click="addToSender">添加到发送器</div>
       <div class="context-menu-item" @click="replayRequest">重放请求</div>
       <div class="context-menu-item" @click="exportToHar">导出选中为 HAR</div>
       <div class="context-menu-item danger" @click="deleteSelected">
@@ -126,10 +127,14 @@ import { CircleCheck, CircleClose, Loading, WarningFilled } from "@element-plus/
 import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
+import { useRouter } from "vue-router";
+import { useSenderStore } from "../stores/sender";
 import { useTrafficStore } from "../stores/traffic";
 import DetailDrawer from "../components/DetailDrawer.vue";
 import { transactionToHarEntry, generateHarFile } from "../utils/har";
 
+const router = useRouter();
+const sender = useSenderStore();
 const traffic = useTrafficStore();
 const running = ref(false);
 const busy = ref(false);
@@ -317,6 +322,27 @@ async function replayRequest() {
     ElMessage.success("已重放请求");
   } catch (e) {
     ElMessage.error(`重放失败：${e}`);
+  }
+}
+
+async function addToSender() {
+  const row = contextMenuRow.value;
+  if (!row) return;
+  contextMenuVisible.value = false;
+  contextMenuRow.value = null;
+
+  try {
+    const detail = await traffic.getDetail(row.id);
+    if (!detail) {
+      ElMessage.warning("会话详情已过期，无法添加到发送器");
+      return;
+    }
+
+    sender.loadFromTrafficDetail(detail);
+    await router.push("/sender");
+    ElMessage.success("已添加到发送器");
+  } catch (e) {
+    ElMessage.error(`添加到发送器失败：${e}`);
   }
 }
 

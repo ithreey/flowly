@@ -13,7 +13,7 @@ Flowly is a local-debugging HTTP/HTTPS proxy and MITM tool. It consists of a Rus
 ![Traffic Monitor](./assets/screenshot-traffic-monitor.png)
 
 - Start or stop the local HTTP/HTTPS proxy
-- Listens on `127.0.0.1:34567` by default
+- Listens on `0.0.0.0:34567` by default
 - View request method, status code, URL, request/response size, duration, and timestamp
 - Filter by HTTP method and URL keywords
 - Batch delete or clear selected sessions
@@ -85,7 +85,7 @@ Regenerating the certificate invalidates previously installed trust relationship
 
 ### Proxy & App Settings
 
-- Configure listening address
+- Configure listening port
 - Configure an optional upstream proxy
 - Toggle automatic system proxy takeover
 - Toggle request/response body collection and set max collection size
@@ -164,7 +164,7 @@ Common parameters:
 --key,  -k    CA private key path, default ca/private.key
 --cert, -c    CA certificate path, default ca/cert.crt
 --rule, -r    Rule JSON file or directory
---bind, -b    Listen address, default 127.0.0.1:34567
+--bind, -b    Listen address, default 0.0.0.0:34567
 --proxy, -p   Optional upstream proxy, e.g. http://127.0.0.1:7890
 ```
 
@@ -175,7 +175,7 @@ cargo run -- run `
   --key ca/private.key `
   --cert ca/cert.crt `
   --rule rules `
-  --bind 127.0.0.1:34567 `
+  --bind 0.0.0.0:34567 `
   --proxy http://127.0.0.1:7890
 ```
 
@@ -186,8 +186,10 @@ CLI rule loading supports a single JSON file or a directory. Rule files in a dir
 1. Generate the Flowly CA certificate.
 2. Install the CA certificate into the OS or target browser's trust store.
 3. Start the Flowly proxy.
-4. Set your browser or client's HTTP/HTTPS proxy to `127.0.0.1:34567`.
+4. Set local browser or client HTTP/HTTPS proxy to `127.0.0.1:34567`; LAN devices should use the Flowly machine's LAN IP, for example `192.168.1.10:34567`.
 5. View sessions on the Traffic Monitor page.
+
+The desktop app only asks for a port. Internally it listens on `0.0.0.0:<port>`, points the local system proxy to `127.0.0.1:<port>`, and LAN devices use the Flowly machine's LAN IP with the same port.
 
 If you only need to inspect HTTP traffic, you can skip CA certificate installation. To decrypt HTTPS, the target domain must be included in a rule's `mitmList`, and the client must trust the Flowly CA.
 

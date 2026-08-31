@@ -35,9 +35,9 @@
         </el-menu-item>
       </el-menu>
       <div class="runtime-card">
-        <div class="runtime-label">Runtime</div>
+        <div class="runtime-label">端口号</div>
         <div class="runtime-row">
-          <span>{{ proxyStatus.listenAddr || "127.0.0.1:34567" }}</span>
+          <span>{{ runtimePort }}</span>
           <span class="status-dot" :class="{ stopped: !proxyStatus.running }" />
         </div>
       </div>
@@ -101,6 +101,10 @@ import InterceptModal from "./components/InterceptModal.vue";
 
 const route = useRoute();
 const active = computed(() => route.path);
+const runtimePort = computed(() => {
+  const listenAddr = String(proxyStatus.value.listenAddr || "34567");
+  return listenAddr.includes(":") ? listenAddr.split(":").pop() : listenAddr;
+});
 const proxyBusy = ref(false);
 const proxyStatus = ref({
   running: false,
@@ -114,7 +118,7 @@ const pageDescriptions = {
   "/sender": "构造和发送 HTTP 请求，调试 API 接口。",
   "/rules": "管理实时生效的流量匹配、过滤和修改规则。",
   "/certs": "生成、安装和复制用于 HTTPS 解密的 CA 证书。",
-  "/settings": "配置监听地址、上游代理和系统代理接管策略。",
+  "/settings": "配置监听端口、上游代理和系统代理接管策略。",
   "/app-settings": "调整应用级显示和工作台偏好。",
 };
 

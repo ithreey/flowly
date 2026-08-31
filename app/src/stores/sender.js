@@ -2,9 +2,71 @@ import { defineStore } from "pinia";
 import { invoke } from "@tauri-apps/api/core";
 
 const SKIPPED_REQUEST_HEADERS = new Set([
+  "connection",
+  "keep-alive",
+  "proxy-authenticate",
+  "proxy-authorization",
+  "te",
+  "trailer",
+  "transfer-encoding",
+  "upgrade",
+  "host",
+  "content-length",
   "if-none-match",
   "if-modified-since",
 ]);
+
+function headerValue(headers, name) {
+  const target = name.toLowerCase();
+  const found = (headers || []).find(
+    ([key]) => String(key).toLowerCase() === target,
+  );
+  return found ? String(found[1] || "") : "";
+}
+
+function splitUrlParams(rawUrl) {
+  if (!rawUrl) return { url: "", params: [] };
+
+  try {
+    const parsed = new URL(rawUrl);
+    const params = Array.from(parsed.searchParams.entries()).map(
+      ([key, value]) => ({
+        key,
+        value,
+        enabled: true,
+      }),
+    );
+    parsed.search = "";
+    parsed.hash = "";
+    return { url: parsed.toString(), params };
+  } catch {
+    return { url: rawUrl, params: [] };
+  }
+}
+
+function parseFormRows(body) {
+  if (!body) return [];
+
+  return Array.from(new URLSearchParams(body).entries()).map(
+    ([key, value]) => ({
+      key,
+      value,
+      enabled: true,
+    }),
+  );
+}
+
+function inferBodyRawFormat(contentType, body) {
+  const type = contentType.toLowerCase();
+  const trimmed = String(body || "").trim();
+
+  if (type.includes("json") || trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    return "JSON";
+  }
+  if (type.includes("xml") || type.includes("svg")) return "XML";
+  if (type.includes("html")) return "HTML";
+  return "Text";
+}
 
 export const useSenderStore = defineStore("sender", {
   state: () => ({
@@ -25,6 +87,7 @@ export const useSenderStore = defineStore("sender", {
 
     // 历史记录
     history: [],
+    selectedHistoryId: null,
   }),
 
   actions: {
@@ -69,7 +132,7 @@ export const useSenderStore = defineStore("sender", {
         };
 
         // 保存到历史（只存请求，不存响应）
-        await invoke("history_save", {
+        const savedEntry = await invoke("history_save", {
           entry: {
             id: 0,
             method: this.method,
@@ -84,6 +147,7 @@ export const useSenderStore = defineStore("sender", {
           },
         });
         await this.loadHistory();
+        this.selectedHistoryId = savedEntry.id;
       } catch (e) {
         this.error = String(e);
       } finally {
@@ -102,14 +166,17 @@ export const useSenderStore = defineStore("sender", {
     async clearHistory() {
       await invoke("history_clear");
       this.history = [];
+      this.selectedHistoryId = null;
     },
 
     async deleteHistory(id) {
       await invoke("history_delete", { id });
       this.history = this.history.filter((h) => h.id !== id);
+      if (this.selectedHistoryId === id) this.selectedHistoryId = null;
     },
 
     loadFromHistory(entry) {
+      this.selectedHistoryId = entry.id;
       this.setRequest({
         method: entry.method,
         url: entry.url,
@@ -128,6 +195,40 @@ export const useSenderStore = defineStore("sender", {
       });
       // 历史只存请求，响应需重新发送
       this.response = null;
+    },
+
+    loadFromTrafficDetail(detail) {
+      const summary = detail?.summary || {};
+      const reqHeaders = detail?.reqHeaders || [];
+      const reqBody = detail?.reqBody || "";
+      const contentType = headerValue(reqHeaders, "content-type");
+      const { url, params } = splitUrlParams(summary.url || "");
+      const isFormBody = contentType
+        .toLowerCase()
+        .includes("application/x-www-form-urlencoded");
+
+      this.setRequest({
+        method: summary.method || "GET",
+        url,
+        params,
+        headers: reqHeaders
+          .filter(
+            ([key]) =>
+              !SKIPPED_REQUEST_HEADERS.has(String(key).trim().toLowerCase()),
+          )
+          .map(([key, value]) => ({
+            key,
+            value,
+            enabled: true,
+          })),
+        formRows: isFormBody ? parseFormRows(reqBody) : [],
+        bodyType: reqBody ? (isFormBody ? "x-www-form-urlencoded" : "raw") : "none",
+        body: isFormBody ? "" : reqBody,
+        bodyRawFormat: inferBodyRawFormat(contentType, reqBody),
+      });
+      this.response = null;
+      this.error = null;
+      this.selectedHistoryId = null;
     },
 
     _buildUrl() {

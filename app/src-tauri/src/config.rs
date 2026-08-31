@@ -9,7 +9,7 @@ pub struct AppConfig {
     pub upstream_proxy: Option<String>,
     pub capture_body: bool,
     pub max_body_size: usize,
-    /// 启动代理时自动设置系统代理到监听地址，停止时还原。
+    /// 启动代理时自动设置本机系统代理，停止时还原。
     pub auto_system_proxy: bool,
     /// 全局 HTTPS MITM 域名模式，一行一个，如 `*`、`*.example.com`。
     #[serde(default)]
@@ -19,7 +19,7 @@ pub struct AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            listen_addr: "127.0.0.1:34567".to_string(),
+            listen_addr: "0.0.0.0:34567".to_string(),
             upstream_proxy: None,
             capture_body: true,
             max_body_size: 256 * 1024,
@@ -53,4 +53,14 @@ pub fn has_mitm_hosts_config(path: &Path) -> bool {
 pub fn save_config(path: &Path, cfg: &AppConfig) -> Result<(), String> {
     let json = serde_json::to_string_pretty(cfg).map_err(|e| format!("序列化配置失败: {e}"))?;
     std::fs::write(path, json).map_err(|e| format!("写配置文件失败: {e}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AppConfig;
+
+    #[test]
+    fn default_config_listens_on_all_ipv4_interfaces() {
+        assert_eq!(AppConfig::default().listen_addr, "0.0.0.0:34567");
+    }
 }

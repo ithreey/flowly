@@ -25,7 +25,7 @@
           v-for="item in group.items"
           :key="item.id"
           class="history-item"
-          :class="{ active: selectedId === item.id }"
+          :class="{ active: store.selectedHistoryId === item.id }"
           @click="selectEntry(item)"
           @contextmenu.prevent="showContextMenu($event, item)"
         >
@@ -65,7 +65,6 @@ import { toCurl } from "../utils/curl";
 
 const store = useSenderStore();
 const searchText = ref("");
-const selectedId = ref(null);
 const ctxMenu = ref({ visible: false, x: 0, y: 0, item: null });
 
 onMounted(() => {
@@ -113,7 +112,6 @@ const filteredGroups = computed(() => {
 });
 
 function selectEntry(item) {
-  selectedId.value = item.id;
   store.loadFromHistory(item);
 }
 
@@ -160,7 +158,6 @@ async function deleteEntry() {
   const item = ctxMenu.value.item;
   if (!item) return;
   await store.deleteHistory(item.id);
-  if (selectedId.value === item.id) selectedId.value = null;
   ctxMenu.value.visible = false;
 }
 
@@ -170,7 +167,6 @@ async function confirmClear() {
       type: "warning",
     });
     await store.clearHistory();
-    selectedId.value = null;
   } catch {
     // 用户取消
   }

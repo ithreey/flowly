@@ -5,14 +5,20 @@
         <div>
           <div class="panel-title">代理设置</div>
           <div class="panel-subtitle">
-            配置监听地址、上游代理和系统代理接管策略。
+            配置监听端口、上游代理和系统代理接管策略。
           </div>
         </div>
       </div>
 
       <el-form label-width="140px" @submit.prevent>
-        <el-form-item label="监听地址">
-          <el-input v-model="listenAddr" placeholder="127.0.0.1:34567" />
+        <el-form-item label="监听端口">
+          <el-input-number
+            v-model="listenPort"
+            :min="1"
+            :max="65535"
+            :step="1"
+            controls-position="right"
+          />
         </el-form-item>
         <el-form-item label="上游代理">
           <el-input
@@ -23,7 +29,7 @@
         <el-form-item label="自动设置系统代理">
           <el-switch v-model="autoSystemProxy" />
           <span class="tip"
-            >启动代理时自动将系统代理指向监听地址，停止时还原</span
+            >启动代理时自动将本机系统代理指向 127.0.0.1:端口，停止时还原</span
           >
         </el-form-item>
         <el-form-item>
@@ -75,7 +81,7 @@
 import { ref, onMounted } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 
-const listenAddr = ref("127.0.0.1:34567");
+const listenPort = ref(34567);
 const upstream = ref("");
 const autoSystemProxy = ref(true);
 const running = ref(false);
@@ -94,10 +100,20 @@ async function refresh() {
 
 async function loadConfig() {
   const cfg = await invoke("config_get");
-  listenAddr.value = cfg.listenAddr;
+  listenPort.value = portFromListenAddr(cfg.listenAddr);
   upstream.value = cfg.upstreamProxy || "";
   autoSystemProxy.value = cfg.autoSystemProxy;
   return cfg;
+}
+
+function listenAddrFromPort() {
+  return `0.0.0.0:${listenPort.value || 34567}`;
+}
+
+function portFromListenAddr(listenAddr) {
+  const value = String(listenAddr || "");
+  const port = Number(value.includes(":") ? value.split(":").pop() : value);
+  return Number.isInteger(port) && port > 0 && port <= 65535 ? port : 34567;
 }
 
 async function start() {
@@ -108,7 +124,7 @@ async function start() {
 
     await invoke("config_set", {
       config: {
-        listenAddr: listenAddr.value,
+        listenAddr: listenAddrFromPort(),
         upstreamProxy: upstream.value || null,
         captureBody: cfg.captureBody ?? true,
         maxBodySize: cfg.maxBodySize,
@@ -118,7 +134,7 @@ async function start() {
     });
 
     status.value = await invoke("proxy_start", {
-      listenAddr: listenAddr.value,
+      listenAddr: listenAddrFromPort(),
       upstreamProxy: upstream.value || null,
     });
     running.value = true;

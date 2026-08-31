@@ -62,6 +62,9 @@ import { Loading } from "@element-plus/icons-vue";
 import { Codemirror } from "vue-codemirror";
 import { json } from "@codemirror/lang-json";
 import { xml } from "@codemirror/lang-xml";
+import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { tags as t } from "@lezer/highlight";
+import { EditorView } from "@codemirror/view";
 import { useSenderStore } from "../stores/sender";
 
 const store = useSenderStore();
@@ -88,6 +91,48 @@ const contentType = computed(() => {
 const bodyBytes = computed(() => store.response?.bodyBytes || []);
 const responseUrl = computed(() => store.response?.url || "");
 
+const editorTheme = EditorView.theme({
+  "&": {
+    color: "#dbeafe",
+    backgroundColor: "rgba(8, 17, 31, 0.78)",
+  },
+  ".cm-content": {
+    caretColor: "#ffffff",
+  },
+  "&.cm-focused .cm-cursor": {
+    borderLeftColor: "#ffffff",
+  },
+  ".cm-cursor": {
+    borderLeftColor: "#ffffff",
+    borderLeftWidth: "2px",
+  },
+  ".cm-activeLine": {
+    backgroundColor: "rgba(56, 189, 248, 0.11)",
+  },
+  ".cm-selectionBackground, &.cm-focused .cm-selectionBackground": {
+    backgroundColor: "rgba(56, 189, 248, 0.24)",
+  },
+  ".cm-gutters": {
+    backgroundColor: "rgba(15, 27, 45, 0.92)",
+    color: "#94a3b8",
+    borderRight: "1px solid rgba(148, 163, 184, 0.22)",
+  },
+  ".cm-activeLineGutter": {
+    backgroundColor: "rgba(56, 189, 248, 0.11)",
+    color: "#dbeafe",
+  },
+});
+
+const bodyHighlight = syntaxHighlighting(
+  HighlightStyle.define([
+    { tag: t.propertyName, color: "#bfdbfe" },
+    { tag: t.string, color: "#a7f3d0" },
+    { tag: t.number, color: "#fbbf24" },
+    { tag: [t.bool, t.null], color: "#f472b6" },
+    { tag: t.punctuation, color: "#cbd5e1" },
+  ]),
+);
+
 const bodyText = computed(() => {
   const bytes = bodyBytes.value;
   if (!bytes.length) return "";
@@ -102,9 +147,10 @@ const bodyText = computed(() => {
 
 const prettyExtensions = computed(() => {
   const ct = contentType.value;
-  if (ct.includes("json")) return [json()];
-  if (ct.includes("xml") || ct.includes("html")) return [xml()];
-  return [];
+  const exts = [editorTheme, bodyHighlight];
+  if (ct.includes("json")) exts.push(json());
+  if (ct.includes("xml") || ct.includes("html")) exts.push(xml());
+  return exts;
 });
 
 const prettyBody = computed(() => {
