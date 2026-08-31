@@ -66,7 +66,7 @@
         </div>
         <div class="status-card">
           <div class="status-label">监听地址</div>
-          <div class="status-value">{{ status.listenAddr || "-" }}</div>
+          <div class="status-value">{{ displayListenAddr }}</div>
         </div>
         <div class="status-card">
           <div class="status-label">上游代理</div>
@@ -78,7 +78,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 
 const listenPort = ref(34567);
@@ -87,7 +87,15 @@ const autoSystemProxy = ref(true);
 const running = ref(false);
 const busy = ref(false);
 const error = ref("");
+const localIp = ref("");
 const status = ref({ running: false, listenAddr: "", upstreamProxy: null });
+
+const displayListenAddr = computed(() => {
+  const addr = status.value.listenAddr || "";
+  if (!addr) return "-";
+  if (!localIp.value) return addr;
+  return addr.replace("0.0.0.0", localIp.value);
+});
 
 async function refresh() {
   try {
@@ -95,6 +103,14 @@ async function refresh() {
     running.value = status.value.running;
   } catch (e) {
     error.value = String(e);
+  }
+}
+
+async function fetchLocalIp() {
+  try {
+    localIp.value = await invoke("get_local_ipv4");
+  } catch {
+    localIp.value = "";
   }
 }
 
@@ -166,6 +182,7 @@ onMounted(async () => {
     error.value = String(e);
   }
   await refresh();
+  await fetchLocalIp();
 });
 </script>
 

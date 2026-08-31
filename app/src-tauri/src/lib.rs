@@ -174,6 +174,7 @@ pub fn run() {
             history::history_clear,
             history::history_delete,
             sender::send_request,
+            get_local_ipv4,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -332,4 +333,16 @@ fn traffic_clear(state: tauri::State<'_, AppState>) -> Result<(), String> {
 fn traffic_delete(state: tauri::State<'_, AppState>, ids: Vec<u64>) -> Result<(), String> {
     state.traffic.delete(&ids);
     Ok(())
+}
+
+/// 获取本机首选 IPv4 地址（通过 UDP 探测，不实际发送数据）。
+#[tauri::command]
+fn get_local_ipv4() -> Result<String, String> {
+    use std::net::UdpSocket;
+    let socket = UdpSocket::bind("0.0.0.0:0").map_err(|e| format!("绑定 UDP 失败: {e}"))?;
+    socket
+        .connect("8.8.8.8:80")
+        .map_err(|e| format!("UDP 连接失败: {e}"))?;
+    let addr = socket.local_addr().map_err(|e| format!("获取地址失败: {e}"))?;
+    Ok(addr.ip().to_string())
 }

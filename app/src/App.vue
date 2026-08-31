@@ -35,9 +35,10 @@
         </el-menu-item>
       </el-menu>
       <div class="runtime-card">
-        <div class="runtime-label">端口号</div>
+        <div class="runtime-label">监听地址</div>
         <div class="runtime-row">
-          <span>{{ runtimePort }}</span>
+          <span v-if="localIp" class="runtime-ip">{{ localIp }}:{{ runtimePort }}</span>
+          <span v-else>{{ runtimePort }}</span>
           <span class="status-dot" :class="{ stopped: !proxyStatus.running }" />
         </div>
       </div>
@@ -105,6 +106,7 @@ const runtimePort = computed(() => {
   const listenAddr = String(proxyStatus.value.listenAddr || "34567");
   return listenAddr.includes(":") ? listenAddr.split(":").pop() : listenAddr;
 });
+const localIp = ref("");
 const proxyBusy = ref(false);
 const proxyStatus = ref({
   running: false,
@@ -112,6 +114,14 @@ const proxyStatus = ref({
   upstreamProxy: null,
 });
 let statusTimer = null;
+
+async function fetchLocalIp() {
+  try {
+    localIp.value = await invoke("get_local_ipv4");
+  } catch {
+    localIp.value = "";
+  }
+}
 
 const pageDescriptions = {
   "/monitor": "捕获 HTTP/HTTPS 会话，筛选、检查并导出 HAR 数据。",
@@ -172,6 +182,7 @@ watch(
 
 onMounted(() => {
   refreshProxyStatus();
+  fetchLocalIp();
   statusTimer = window.setInterval(refreshProxyStatus, 4000);
 });
 
@@ -352,6 +363,10 @@ body::before {
   color: var(--gm-text);
   font-family: "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
   font-size: 12px;
+}
+
+.runtime-ip {
+  color: var(--gm-muted);
 }
 
 .status-dot {
