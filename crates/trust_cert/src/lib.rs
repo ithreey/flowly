@@ -8,11 +8,11 @@ mod linux;
 pub fn trust_cert(der: &[u8]) -> Result<(), String> {
     #[cfg(windows)]
     {
-        return windows::install_cert(der);
+        windows::install_cert(der)
     }
     #[cfg(target_os = "linux")]
     {
-        return linux::install_cert(der);
+        linux::install_cert(der)
     }
     #[cfg(not(any(windows, target_os = "linux")))]
     {
