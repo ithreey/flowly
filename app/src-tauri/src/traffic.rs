@@ -1,6 +1,6 @@
 use mitm_core::hyper;
 use mitm_core::hyper::body::HttpBody;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, VecDeque},
     sync::{
@@ -56,6 +56,24 @@ pub struct TransactionDetail {
     pub req_body: Option<String>,
     pub res_headers: Vec<(String, String)>,
     pub res_body: Option<String>,
+}
+
+/// 轻量事务详情，不含请求/响应 body，用于详情抽屉首屏快速渲染。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TransactionMeta {
+    pub summary: TrafficSummary,
+    pub req_headers: Vec<(String, String)>,
+    pub res_headers: Vec<(String, String)>,
+    pub req_body_available: bool,
+    pub res_body_available: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum TrafficBodyKind {
+    Request,
+    Response,
 }
 
 /// 全局共享的流量记录：
@@ -211,6 +229,31 @@ impl SharedTraffic {
     /// 按 id 拉取完整事务（含 headers/body）。
     pub fn get(&self, id: u64) -> Option<TransactionDetail> {
         self.transactions.read().unwrap().get(&id).cloned()
+    }
+
+    /// 按 id 拉取轻量事务详情，不克隆 body 文本。
+    pub fn get_meta(&self, id: u64) -> Option<TransactionMeta> {
+        self.transactions
+            .read()
+            .unwrap()
+            .get(&id)
+            .map(|detail| TransactionMeta {
+                summary: detail.summary.clone(),
+                req_headers: detail.req_headers.clone(),
+                res_headers: detail.res_headers.clone(),
+                req_body_available: detail.req_body.is_some(),
+                res_body_available: detail.res_body.is_some(),
+            })
+    }
+
+    /// 按 id 与类型拉取单侧 body，避免打开详情时一次性传输大文本。
+    pub fn get_body(&self, id: u64, kind: TrafficBodyKind) -> Option<String> {
+        let transactions = self.transactions.read().unwrap();
+        let detail = transactions.get(&id)?;
+        match kind {
+            TrafficBodyKind::Request => detail.req_body.clone(),
+            TrafficBodyKind::Response => detail.res_body.clone(),
+        }
     }
 
     /// 批量获取完整事务（按 id 列表），保持顺序，缺失的条目为 None。
@@ -372,5 +415,70 @@ mod tests {
         assert_eq!(list[0].phase, TrafficPhase::Completed);
         assert_eq!(list[0].status, Some(200));
         assert_eq!(list[0].res_size, 2);
+    }
+
+    #[test]
+    fn get_meta_returns_headers_and_body_availability_without_body_text() {
+        let traffic = SharedTraffic::new();
+        traffic.begin_request(
+            1,
+            "POST".to_string(),
+            "http://example.test/path".to_string(),
+            "example.test".to_string(),
+            vec![("content-type".to_string(), "text/plain".to_string())],
+            Some("request body".to_string()),
+            12,
+            Some("text/plain".to_string()),
+        );
+        traffic.complete(
+            1,
+            200,
+            Some("application/json".to_string()),
+            vec![("content-type".to_string(), "application/json".to_string())],
+            Some("{\"ok\":true}".to_string()),
+            11,
+            false,
+        );
+
+        let meta = traffic.get_meta(1).expect("meta");
+
+        assert_eq!(meta.summary.method, "POST");
+        assert_eq!(meta.req_headers.len(), 1);
+        assert_eq!(meta.res_headers.len(), 1);
+        assert!(meta.req_body_available);
+        assert!(meta.res_body_available);
+    }
+
+    #[test]
+    fn get_body_returns_request_or_response_body_only() {
+        let traffic = SharedTraffic::new();
+        traffic.begin_request(
+            1,
+            "POST".to_string(),
+            "http://example.test/path".to_string(),
+            "example.test".to_string(),
+            Vec::new(),
+            Some("request body".to_string()),
+            12,
+            None,
+        );
+        traffic.complete(
+            1,
+            200,
+            None,
+            Vec::new(),
+            Some("response body".to_string()),
+            13,
+            false,
+        );
+
+        assert_eq!(
+            traffic.get_body(1, TrafficBodyKind::Request),
+            Some("request body".to_string())
+        );
+        assert_eq!(
+            traffic.get_body(1, TrafficBodyKind::Response),
+            Some("response body".to_string())
+        );
     }
 }

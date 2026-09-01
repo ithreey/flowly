@@ -14,7 +14,22 @@
         >
           {{ detail.summary.method }}
         </span>
-        <span class="drawer-url">{{ titleUrl }}</span>
+        <span class="drawer-url" :class="{ expanded: urlExpanded }">{{
+          titleUrl
+        }}</span>
+        <el-button
+          v-if="showUrlToggle"
+          class="url-toggle"
+          text
+          circle
+          size="small"
+          @click.stop="urlExpanded = !urlExpanded"
+        >
+          <el-icon>
+            <ArrowUp v-if="urlExpanded" />
+            <ArrowDown v-else />
+          </el-icon>
+        </el-button>
       </div>
     </template>
     <div v-if="loading" class="placeholder">加载中...</div>
@@ -65,8 +80,8 @@
           </template>
         </el-dropdown>
       </div>
-      <el-tabs>
-        <el-tab-pane label="请求">
+      <el-tabs v-model="activeTab">
+        <el-tab-pane label="请求" name="request">
           <h4>请求行</h4>
           <pre class="mono">{{ requestLine }}</pre>
           <h4>Headers</h4>
@@ -98,40 +113,53 @@
               class="copy-btn"
               size="small"
               text
+              :disabled="detail.reqBodyAvailable && !reqBodyLoaded"
               @click="copyText(currentReqBody())"
             >
               复制
             </el-button>
+            <pre v-if="reqBodyLoading" class="body dim">加载 Body 中...</pre>
+            <pre v-else-if="reqBodyError" class="body dim">{{
+              reqBodyError
+            }}</pre>
+            <div
+              v-else-if="detail.reqBodyAvailable && !reqBodyLoaded"
+              class="body-lazy"
+            >
+              <el-button
+                size="small"
+                type="primary"
+                plain
+                @click="loadBody('request')"
+              >
+                加载请求 Body ({{ formatSize(detail.summary.reqSize) }})
+              </el-button>
+            </div>
             <pre
-              v-if="reqBodyMode === 'raw'"
+              v-else-if="reqBodyMode === 'raw'"
               class="body"
-              :class="{ dim: !detail.reqBody }"
-              >{{ detail.reqBody || "(无 body 或未捕获)" }}
+              :class="{ dim: !reqBody }"
+              >{{ reqBody || "(无 body 或未捕获)" }}
             </pre>
             <template v-else-if="reqBodyMode === 'json'">
-              <pre v-if="formatJson(detail.reqBody)" class="body">{{
-                formatJson(detail.reqBody)
-              }}</pre>
+              <pre v-if="reqBodyJson" class="body">{{ reqBodyJson }}</pre>
               <pre v-else class="body dim">{{
-                detail.reqBody
+                reqBody
                   ? "(不是有效的 JSON，请切回原文查看)"
                   : "(无 body 或未捕获)"
               }}</pre>
             </template>
             <template v-else>
-              <pre
-                v-if="formatForm(detail.reqHeaders, detail.reqBody)"
-                class="body"
-                >{{ formatForm(detail.reqHeaders, detail.reqBody) }}</pre>
+              <pre v-if="reqBodyForm" class="body">{{ reqBodyForm }}</pre>
               <pre v-else class="body dim">{{
-                detail.reqBody
+                reqBody
                   ? "(不是 application/x-www-form-urlencoded，请切回原文查看)"
                   : "(无 body 或未捕获)"
               }}</pre>
             </template>
           </div>
         </el-tab-pane>
-        <el-tab-pane label="响应">
+        <el-tab-pane label="响应" name="response">
           <h4>状态行</h4>
           <pre class="mono">{{ responseLine }}</pre>
           <h4>Headers</h4>
@@ -162,29 +190,45 @@
               class="copy-btn"
               size="small"
               text
+              :disabled="detail.resBodyAvailable && !resBodyLoaded"
               @click="copyText(currentResBody())"
             >
               复制
             </el-button>
+            <pre v-if="resBodyLoading" class="body dim">加载 Body 中...</pre>
+            <pre v-else-if="resBodyError" class="body dim">{{
+              resBodyError
+            }}</pre>
+            <div
+              v-else-if="detail.resBodyAvailable && !resBodyLoaded"
+              class="body-lazy"
+            >
+              <el-button
+                size="small"
+                type="primary"
+                plain
+                @click="loadBody('response')"
+              >
+                加载响应 Body ({{ formatSize(detail.summary.resSize) }})
+              </el-button>
+            </div>
             <pre
-              v-if="resBodyMode === 'raw'"
+              v-else-if="resBodyMode === 'raw'"
               class="body"
-              :class="{ dim: !detail.resBody }"
-              >{{ detail.resBody || "(无 body 或未捕获)" }}
+              :class="{ dim: !resBody }"
+              >{{ resBody || "(无 body 或未捕获)" }}
             </pre>
             <template v-else>
-              <pre v-if="formatJson(detail.resBody)" class="body">{{
-                formatJson(detail.resBody)
-              }}</pre>
+              <pre v-if="resBodyJson" class="body">{{ resBodyJson }}</pre>
               <pre v-else class="body dim">{{
-                detail.resBody
+                resBody
                   ? "(不是有效的 JSON，请切回原文查看)"
                   : "(无 body 或未捕获)"
               }}</pre>
             </template>
           </div>
         </el-tab-pane>
-        <el-tab-pane label="时间线">
+        <el-tab-pane label="时间线" name="timeline">
           <div class="timeline-panel">
             <div class="timeline-row">
               <span>开始时间</span>
@@ -214,8 +258,13 @@
 <script setup>
 import { ref, computed, watch } from "vue";
 import { ElMessage } from "element-plus";
-import { ArrowDown } from "@element-plus/icons-vue";
+import { ArrowDown, ArrowUp } from "@element-plus/icons-vue";
 import { useTrafficStore } from "../stores/traffic";
+import {
+  shouldCollapseUrlAfterSelectionChange,
+  shouldShowUrlToggle,
+} from "../utils/detail-url-collapse";
+import { shouldAutoLoadBody } from "../utils/detail-body-loading";
 import { isFormUrlEncoded, parseFormParams } from "../utils/har";
 
 const props = defineProps({
@@ -228,6 +277,17 @@ const traffic = useTrafficStore();
 const detail = ref(null);
 const loading = ref(false);
 const error = ref("");
+const urlExpanded = ref(false);
+const activeTab = ref("request");
+const reqBody = ref("");
+const resBody = ref("");
+const reqBodyLoaded = ref(false);
+const resBodyLoaded = ref(false);
+const reqBodyLoading = ref(false);
+const resBodyLoading = ref(false);
+const reqBodyError = ref("");
+const resBodyError = ref("");
+let detailLoadVersion = 0;
 
 // body 展示模式：默认原文。
 const reqBodyMode = ref("raw");
@@ -298,7 +358,7 @@ function formatDuration(summary) {
 /** 当前请求 body 的展示文本（JSON 模式下复制格式化后的内容）。 */
 function currentReqBody() {
   if (!detail.value) return "";
-  const text = detail.value.reqBody || "";
+  const text = reqBody.value || "";
   if (reqBodyMode.value === "json" && formatJson(text)) return formatJson(text);
   if (
     reqBodyMode.value === "form" &&
@@ -312,7 +372,7 @@ function currentReqBody() {
 /** 当前响应 body 的展示文本。 */
 function currentResBody() {
   if (!detail.value) return "";
-  const text = detail.value.resBody || "";
+  const text = resBody.value || "";
   if (resBodyMode.value === "json" && formatJson(text)) return formatJson(text);
   return text;
 }
@@ -376,6 +436,16 @@ const titleUrl = computed(() =>
   detail.value ? detail.value.summary.url : "详情",
 );
 
+const showUrlToggle = computed(() =>
+  shouldShowUrlToggle(detail.value?.summary?.url),
+);
+
+const reqBodyJson = computed(() => formatJson(reqBody.value));
+const resBodyJson = computed(() => formatJson(resBody.value));
+const reqBodyForm = computed(() =>
+  detail.value ? formatForm(detail.value.reqHeaders, reqBody.value) : null,
+);
+
 const requestLine = computed(() => {
   if (!detail.value) return "";
   const s = detail.value.summary;
@@ -396,27 +466,122 @@ function formatHeaders(headers) {
   return headers.map(([k, v]) => `${k}: ${v}`).join("\n");
 }
 
+function resetBodies() {
+  reqBody.value = "";
+  resBody.value = "";
+  reqBodyLoaded.value = false;
+  resBodyLoaded.value = false;
+  reqBodyLoading.value = false;
+  resBodyLoading.value = false;
+  reqBodyError.value = "";
+  resBodyError.value = "";
+}
+
+function bodyAvailable(kind) {
+  if (!detail.value) return false;
+  return kind === "request"
+    ? detail.value.reqBodyAvailable
+    : detail.value.resBodyAvailable;
+}
+
+function bodySize(kind) {
+  if (!detail.value) return 0;
+  return kind === "request"
+    ? detail.value.summary.reqSize
+    : detail.value.summary.resSize;
+}
+
+function bodyLoaded(kind) {
+  return kind === "request" ? reqBodyLoaded.value : resBodyLoaded.value;
+}
+
+function canAutoLoadBody(kind) {
+  return shouldAutoLoadBody({
+    available: bodyAvailable(kind),
+    size: bodySize(kind),
+  });
+}
+
+function loadAutoBodyForActiveTab() {
+  const kind = activeTab.value === "response" ? "response" : "request";
+  if (canAutoLoadBody(kind) && !bodyLoaded(kind)) {
+    loadBody(kind);
+  }
+}
+
+async function loadBody(kind) {
+  if (!detail.value) return;
+  const id = detail.value.summary.id;
+  const isRequest = kind === "request";
+  const loaded = isRequest ? reqBodyLoaded : resBodyLoaded;
+  const loadingState = isRequest ? reqBodyLoading : resBodyLoading;
+  const errorState = isRequest ? reqBodyError : resBodyError;
+  const bodyState = isRequest ? reqBody : resBody;
+
+  if (loaded.value || loadingState.value) return;
+  loadingState.value = true;
+  errorState.value = "";
+  try {
+    const body = await traffic.getBody(id, kind);
+    if (detail.value?.summary?.id !== id) return;
+    bodyState.value = body || "";
+    loaded.value = true;
+  } catch (e) {
+    if (detail.value?.summary?.id !== id) return;
+    errorState.value = `加载 Body 失败: ${String(e)}`;
+  } finally {
+    if (detail.value?.summary?.id === id) {
+      loadingState.value = false;
+    }
+  }
+}
+
 watch(
   () => [props.modelValue, props.id],
-  async ([visible, id]) => {
+  async ([visible, id], [, previousId] = []) => {
+    if (
+      shouldCollapseUrlAfterSelectionChange({
+        visible,
+        currentId: id,
+        previousId,
+      })
+    ) {
+      urlExpanded.value = false;
+    }
     if (visible && id != null) {
+      const loadVersion = ++detailLoadVersion;
       loading.value = true;
       error.value = "";
       detail.value = null;
+      activeTab.value = "request";
+      resetBodies();
       try {
-        const result = await traffic.getDetail(id);
+        const result = await traffic.getDetailMeta(id);
+        if (loadVersion !== detailLoadVersion || !props.modelValue || props.id !== id) return;
         detail.value = result;
+        loadAutoBodyForActiveTab();
       } catch (e) {
+        if (loadVersion !== detailLoadVersion) return;
         error.value = String(e);
         detail.value = null;
       } finally {
-        loading.value = false;
+        if (loadVersion === detailLoadVersion) {
+          loading.value = false;
+        }
       }
     } else {
+      detailLoadVersion += 1;
       detail.value = null;
+      urlExpanded.value = false;
+      activeTab.value = "request";
+      resetBodies();
     }
   },
 );
+
+watch(activeTab, () => {
+  loadAutoBodyForActiveTab();
+});
 </script>
 
 <style scoped>
@@ -489,11 +654,32 @@ watch(
 
 .drawer-url {
   min-width: 0;
+  flex: 1;
   color: #dbeafe;
   font-family: "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
   font-size: 13px;
-  white-space: normal;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   word-break: break-all;
+}
+
+.drawer-url.expanded {
+  display: block;
+  overflow: visible;
+  -webkit-line-clamp: unset;
+}
+
+.url-toggle {
+  flex: 0 0 auto;
+  margin-top: -2px;
+  color: var(--gm-muted);
+}
+
+.url-toggle:hover,
+.url-toggle:focus {
+  color: var(--gm-cyan);
 }
 
 .summary-grid {
@@ -608,6 +794,16 @@ h4 {
   word-break: break-all;
   max-height: 400px;
   overflow: auto;
+}
+
+.body-lazy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 96px;
+  border: 1px dashed rgba(56, 189, 248, 0.24);
+  border-radius: 6px;
+  background: rgba(7, 16, 29, 0.58);
 }
 
 .dim {

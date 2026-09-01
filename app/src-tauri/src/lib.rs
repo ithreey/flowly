@@ -24,7 +24,9 @@ use crate::config::AppConfig;
 use crate::gui_handler::GuiHandler;
 use crate::intercept::InterceptRequest;
 use crate::state::AppState;
-use crate::traffic::{SharedTraffic, TransactionDetail, spawn_traffic_bridge};
+use crate::traffic::{
+    SharedTraffic, TrafficBodyKind, TransactionDetail, TransactionMeta, spawn_traffic_bridge,
+};
 
 fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     fit_main_window_to_screen(app);
@@ -157,6 +159,8 @@ pub fn run() {
             config_get,
             config_set,
             traffic_get,
+            traffic_get_meta,
+            traffic_get_body,
             traffic_get_batch,
             traffic_replay,
             traffic_clear,
@@ -197,6 +201,23 @@ fn traffic_get(
     id: u64,
 ) -> Result<Option<TransactionDetail>, String> {
     Ok(state.traffic.get(id))
+}
+
+#[tauri::command]
+fn traffic_get_meta(
+    state: tauri::State<'_, AppState>,
+    id: u64,
+) -> Result<Option<TransactionMeta>, String> {
+    Ok(state.traffic.get_meta(id))
+}
+
+#[tauri::command]
+fn traffic_get_body(
+    state: tauri::State<'_, AppState>,
+    id: u64,
+    kind: TrafficBodyKind,
+) -> Result<Option<String>, String> {
+    Ok(state.traffic.get_body(id, kind))
 }
 
 #[tauri::command]

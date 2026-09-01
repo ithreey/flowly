@@ -32,6 +32,12 @@ export const useTrafficStore = defineStore("traffic", {
     async getDetail(id) {
       return await invoke("traffic_get", { id });
     },
+    async getDetailMeta(id) {
+      return await invoke("traffic_get_meta", { id });
+    },
+    async getBody(id, kind) {
+      return await invoke("traffic_get_body", { id, kind });
+    },
     /** 批量获取完整事务详情（按 id 数组），返回数组，顺序与 ids 一致，缺失的为 null。 */
     async getDetailsBatch(ids) {
       return await invoke("traffic_get_batch", { ids });
