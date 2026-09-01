@@ -50,18 +50,12 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev
 
-      - name: Install Tauri CLI
-        uses: baptiste0928/cargo-install@v3
-        with:
-          crate: cargo-tauri
-          locked: true
-
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm install
         working-directory: app
 
       - name: Build Tauri app
-        run: cargo tauri build
+        run: npx tauri build
         working-directory: app
 
       - name: Upload release assets
