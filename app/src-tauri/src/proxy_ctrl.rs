@@ -38,6 +38,12 @@ async fn oneshot_shutdown(rx: oneshot::Receiver<()>) {
     let _ = rx.await;
 }
 
+fn spawn_proxy_join_cleanup(join_handle: tokio::task::JoinHandle<()>) {
+    tokio::spawn(async move {
+        let _ = tokio::time::timeout(std::time::Duration::from_secs(2), join_handle).await;
+    });
+}
+
 #[tauri::command]
 pub async fn proxy_start(
     state: tauri::State<'_, AppState>,
@@ -126,8 +132,8 @@ pub async fn proxy_stop(state: tauri::State<'_, AppState>) -> Result<(), String>
         if let Some(guard) = &handle.system_proxy {
             system_proxy::restore_system_proxy(guard);
         }
-        // 等待 accept 循环退出（含 2s 超时兜底，避免异常时挂起）。
-        let _ = tokio::time::timeout(std::time::Duration::from_secs(2), handle.join_handle).await;
+        // 后台等待 accept 循环退出，避免停止按钮被 2s 兜底等待阻塞。
+        spawn_proxy_join_cleanup(handle.join_handle);
     }
     Ok(())
 }
@@ -192,7 +198,10 @@ pub fn shutdown_sync(state: &AppState) {
 
 #[cfg(test)]
 mod tests {
-    use super::{listen_addr_from_port, normalize_listen_addr, system_proxy_addr};
+    use super::{
+        listen_addr_from_port, normalize_listen_addr, spawn_proxy_join_cleanup, system_proxy_addr,
+    };
+    use std::time::{Duration, Instant};
 
     #[test]
     fn system_proxy_addr_uses_loopback_for_unspecified_ipv4_listen_addr() {
@@ -223,6 +232,21 @@ mod tests {
         assert_eq!(
             normalize_listen_addr("127.0.0.1:34567").unwrap().to_string(),
             "127.0.0.1:34567"
+        );
+    }
+
+    #[tokio::test]
+    async fn spawn_proxy_join_cleanup_does_not_wait_for_join_handle_to_finish() {
+        let join_handle = tokio::spawn(async {
+            tokio::time::sleep(Duration::from_secs(5)).await;
+        });
+
+        let started = Instant::now();
+        spawn_proxy_join_cleanup(join_handle);
+
+        assert!(
+            started.elapsed() < Duration::from_millis(100),
+            "cleanup should be detached from the caller"
         );
     }
 }
