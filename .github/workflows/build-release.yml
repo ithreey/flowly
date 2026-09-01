@@ -51,13 +51,13 @@ jobs:
             librsvg2-dev
 
       - name: Install Tauri CLI
-        uses: taiki-e/install-action@cargo-binstall
-
-      - name: Install cargo-tauri
-        run: cargo binstall cargo-tauri -y
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: cargo-tauri
+          locked: true
 
       - name: Install frontend dependencies
-        run: npm install
+        run: npm ci
         working-directory: app
 
       - name: Build Tauri app
@@ -69,6 +69,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          files: app/src-tauri/target/release/bundle/**/*
+          files: |
+            app/src-tauri/target/release/bundle/nsis/*.exe
+            app/src-tauri/target/release/bundle/msi/*.msi
+            app/src-tauri/target/release/bundle/dmg/*.dmg
+            app/src-tauri/target/release/bundle/macos/*.app.tar.gz
+            app/src-tauri/target/release/bundle/deb/*.deb
+            app/src-tauri/target/release/bundle/appimage/*.AppImage
           prerelease: ${{ contains(github.ref, '-') }}
           generate_release_notes: true
