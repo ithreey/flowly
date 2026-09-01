@@ -24,13 +24,13 @@ jobs:
             platform: linux-x64
 
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v5
 
       - name: Install Rust toolchain
         run: rustup show
 
       - name: Install Node.js
-        uses: actions/setup-node@v4.4.0
+        uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
