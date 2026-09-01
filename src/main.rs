@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use anyhow::{Ok, Result};
+use anyhow::Result;
 use clap::Parser;
 use hyper_proxy::Intercept;
 use log::*;
@@ -67,7 +67,7 @@ fn main() {
             let cert = ca::gen_ca();
             if opts.trust {
                 #[cfg(feature = "trust-cert")]
-                if let Some(der) = cert.serialize_der().ok() {
+                if let Ok(der) = cert.serialize_der() {
                     if let Err(e) = trust_cert::trust_cert(&der) {
                         eprintln!("安装证书失败: {e}");
                     }
