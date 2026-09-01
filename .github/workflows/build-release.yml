@@ -5,76 +5,55 @@ on:
     tags:
       - 'v*'
 
-env:
-  CARGO_TERM_COLOR: always
+permissions:
+  contents: write
 
 jobs:
-  build-cross:
-    name: ${{ matrix.target }}
-    runs-on: ubuntu-latest
+  build:
+    name: ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        target:
-          - i686-unknown-linux-musl
-          - x86_64-pc-windows-gnu
-          - x86_64-unknown-linux-gnu
-          - x86_64-unknown-linux-musl
-          - armv7-unknown-linux-musleabihf
-          - armv7-unknown-linux-gnueabihf
-          - aarch64-unknown-linux-gnu
-          - aarch64-unknown-linux-musl
+        include:
+          - os: windows-latest
+            platform: windows-x64
+          - os: macos-latest
+            platform: macos
+          - os: ubuntu-latest
+            platform: linux-x64
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
         run: rustup show
 
-      - name: Install cross
-        uses: taiki-e/install-action@cross
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/package-lock.json
 
-      - name: Build
-        env:
-          PKG_CONFIG_ALLOW_CROSS: "1"
+      - name: Install Linux dependencies
+        if: matrix.os == 'ubuntu-latest'
         run: |
-          cd build
-          ./build-release.sh -t ${{ matrix.target }}
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
 
-      - name: Upload release assets
-        uses: softprops/action-gh-release@v2
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          files: build/release/*
-          prerelease: ${{ contains(github.ref, '-') }}
-          generate_release_notes: true
-
-  build-macos:
-    name: ${{ matrix.target }}
-    runs-on: macos-latest
-    strategy:
-      matrix:
-        target:
-          - x86_64-apple-darwin
-          - aarch64-apple-darwin
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        run: |
-          rustup target add ${{ matrix.target }}
-          rustup show
-
-      - name: Install dependencies
-        run: brew install openssl
-
-      - name: Build
-        run: ./build/build-host-release.sh -t ${{ matrix.target }}
-
-      - name: Upload release assets
-        uses: softprops/action-gh-release@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          files: build/release/*
-          prerelease: ${{ contains(github.ref, '-') }}
-          generate_release_notes: true
+          projectPath: app
+          args: --verbose
