@@ -1254,7 +1254,6 @@ dependencies = [
  "flowly",
  "flowly-core",
  "flowly-rule",
- "moka",
  "rustls",
  "rustls-pemfile",
  "serde",

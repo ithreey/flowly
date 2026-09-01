@@ -2,7 +2,7 @@ use mitm_core::hyper;
 use mitm_core::hyper::body::HttpBody;
 use serde::Serialize;
 use std::{
-    collections::VecDeque,
+    collections::{HashMap, VecDeque},
     sync::{
         Arc, RwLock,
         atomic::{AtomicU64, Ordering},
@@ -16,8 +16,6 @@ use crate::config::AppConfig;
 
 /// 摘要环容量：列表页只保留最近 500 条事务摘要（不含 body）。
 const SUMMARY_RING_CAP: usize = 500;
-/// 完整事务（含 body）缓存条目上限，与列表容量保持一致。
-const TXN_CACHE_MAX: u64 = 500;
 /// broadcast 通道容量。
 const CHANNEL_CAPACITY: usize = 1024;
 
@@ -62,14 +60,14 @@ pub struct TransactionDetail {
 
 /// 全局共享的流量记录：
 /// - `summaries`：摘要环（分页查询）
-/// - `transactions`：完整事务缓存（含 body，TTL 自动清理）
+/// - `transactions`：完整事务表（含 body），生命周期由摘要环统一控制
 /// - `tx`：broadcast，实时推送给前端
 #[derive(Clone)]
 pub struct SharedTraffic {
     next_id: Arc<AtomicU64>,
     tx: broadcast::Sender<TrafficSummary>,
     summaries: Arc<RwLock<VecDeque<TrafficSummary>>>,
-    transactions: moka::sync::Cache<u64, TransactionDetail>,
+    transactions: Arc<RwLock<HashMap<u64, TransactionDetail>>>,
 }
 
 impl Default for SharedTraffic {
@@ -85,9 +83,7 @@ impl SharedTraffic {
             next_id: Arc::new(AtomicU64::new(1)),
             tx,
             summaries: Arc::new(RwLock::new(VecDeque::with_capacity(SUMMARY_RING_CAP))),
-            transactions: moka::sync::Cache::builder()
-                .max_capacity(TXN_CACHE_MAX)
-                .build(),
+            transactions: Arc::new(RwLock::new(HashMap::with_capacity(SUMMARY_RING_CAP))),
         }
     }
 
@@ -125,7 +121,7 @@ impl SharedTraffic {
             started_at: now_unix_millis(),
             truncated: false,
         };
-        self.transactions.insert(
+        self.transactions.write().unwrap().insert(
             id,
             TransactionDetail {
                 summary: summary.clone(),
@@ -149,38 +145,43 @@ impl SharedTraffic {
         res_size: usize,
         truncated: bool,
     ) {
-        let Some(mut detail) = self.transactions.get(&id) else {
-            return;
+        let summary = {
+            let mut transactions = self.transactions.write().unwrap();
+            let Some(detail) = transactions.get_mut(&id) else {
+                return;
+            };
+            let start = detail.summary.started_at;
+            let now = now_unix_millis();
+
+            detail.summary.status = Some(status);
+            detail.summary.phase = TrafficPhase::Completed;
+            detail.summary.content_type =
+                content_type.or_else(|| detail.summary.content_type.take());
+            detail.summary.res_size = res_size;
+            detail.summary.duration_ms = now.saturating_sub(start);
+            detail.summary.truncated = truncated;
+            detail.res_headers = res_headers;
+            detail.res_body = res_body;
+
+            detail.summary.clone()
         };
-        let start = detail.summary.started_at;
-        let now = now_unix_millis();
-
-        detail.summary.status = Some(status);
-        detail.summary.phase = TrafficPhase::Completed;
-        detail.summary.content_type = content_type.or(detail.summary.content_type);
-        detail.summary.res_size = res_size;
-        detail.summary.duration_ms = now.saturating_sub(start);
-        detail.summary.truncated = truncated;
-        detail.res_headers = res_headers;
-        detail.res_body = res_body;
-
-        let summary = detail.summary.clone();
-        self.transactions.insert(id, detail);
         self.upsert_summary(summary);
     }
 
     pub fn fail(&self, id: u64) {
-        let Some(mut detail) = self.transactions.get(&id) else {
-            return;
+        let summary = {
+            let mut transactions = self.transactions.write().unwrap();
+            let Some(detail) = transactions.get_mut(&id) else {
+                return;
+            };
+            let start = detail.summary.started_at;
+            let now = now_unix_millis();
+
+            detail.summary.phase = TrafficPhase::Failed;
+            detail.summary.duration_ms = now.saturating_sub(start);
+
+            detail.summary.clone()
         };
-        let start = detail.summary.started_at;
-        let now = now_unix_millis();
-
-        detail.summary.phase = TrafficPhase::Failed;
-        detail.summary.duration_ms = now.saturating_sub(start);
-
-        let summary = detail.summary.clone();
-        self.transactions.insert(id, detail);
         self.upsert_summary(summary);
     }
 
@@ -190,7 +191,7 @@ impl SharedTraffic {
             *existing = summary.clone();
         } else if ring.len() >= SUMMARY_RING_CAP {
             if let Some(expired) = ring.pop_front() {
-                self.transactions.invalidate(&expired.id);
+                self.transactions.write().unwrap().remove(&expired.id);
             }
             ring.push_back(summary.clone());
         } else {
@@ -209,17 +210,18 @@ impl SharedTraffic {
 
     /// 按 id 拉取完整事务（含 headers/body）。
     pub fn get(&self, id: u64) -> Option<TransactionDetail> {
-        self.transactions.get(&id)
+        self.transactions.read().unwrap().get(&id).cloned()
     }
 
     /// 批量获取完整事务（按 id 列表），保持顺序，缺失的条目为 None。
     pub fn get_batch(&self, ids: &[u64]) -> Vec<Option<TransactionDetail>> {
-        ids.iter().map(|id| self.transactions.get(id)).collect()
+        let transactions = self.transactions.read().unwrap();
+        ids.iter().map(|id| transactions.get(id).cloned()).collect()
     }
 
     pub fn clear(&self) {
         self.summaries.write().unwrap().clear();
-        self.transactions.invalidate_all();
+        self.transactions.write().unwrap().clear();
     }
 
     pub fn delete(&self, ids: &[u64]) {
@@ -230,8 +232,9 @@ impl SharedTraffic {
         ring.retain(|summary| !ids.contains(&summary.id));
         drop(ring);
 
+        let mut transactions = self.transactions.write().unwrap();
         for id in ids {
-            self.transactions.invalidate(id);
+            transactions.remove(id);
         }
     }
 }

@@ -105,6 +105,37 @@ fn test_summary_ring_keeps_latest_500_entries() {
 }
 
 #[test]
+fn test_visible_summaries_keep_matching_details_after_cache_rollover() {
+    let traffic = SharedTraffic::new();
+
+    for id in 1..=700 {
+        traffic.begin_request(
+            id,
+            "GET".to_string(),
+            format!("http://example.com/{id}"),
+            "example.com".to_string(),
+            vec![],
+            None,
+            0,
+            None,
+        );
+        traffic.complete(id, 200, None, vec![], None, 0, false);
+    }
+
+    let missing_ids: Vec<u64> = traffic
+        .list(1000, 0)
+        .into_iter()
+        .map(|summary| summary.id)
+        .filter(|id| traffic.get(*id).is_none())
+        .collect();
+
+    assert!(
+        missing_ids.is_empty(),
+        "visible summaries without details: {missing_ids:?}"
+    );
+}
+
+#[test]
 fn test_delete_removes_summaries_and_details() {
     let traffic = SharedTraffic::new();
 
