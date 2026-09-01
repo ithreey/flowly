@@ -50,10 +50,25 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev
 
+      - name: Install Tauri CLI
+        uses: taiki-e/install-action@cargo-binstall
+
+      - name: Install cargo-tauri
+        run: cargo binstall cargo-tauri -y
+
+      - name: Install frontend dependencies
+        run: npm install
+        working-directory: app
+
       - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
+        run: cargo tauri build
+        working-directory: app
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          projectPath: app
-          args: --verbose
+          files: app/src-tauri/target/release/bundle/**/*
+          prerelease: ${{ contains(github.ref, '-') }}
+          generate_release_notes: true
