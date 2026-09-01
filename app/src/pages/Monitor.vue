@@ -132,6 +132,7 @@ import { useSenderStore } from "../stores/sender";
 import { useTrafficStore } from "../stores/traffic";
 import DetailDrawer from "../components/DetailDrawer.vue";
 import { transactionToHarEntry, generateHarFile } from "../utils/har";
+import { shouldClearTrafficOnKeydown } from "../utils/traffic-shortcuts";
 
 const router = useRouter();
 const sender = useSenderStore();
@@ -495,12 +496,7 @@ watch(
 );
 
 async function handleKeydown(event) {
-  if (
-    event.ctrlKey &&
-    !event.shiftKey &&
-    !event.altKey &&
-    event.key.toLowerCase() === "w"
-  ) {
+  if (shouldClearTrafficOnKeydown(event)) {
     event.preventDefault();
     await clear();
     ElMessage.success("已清空会话");
