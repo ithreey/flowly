@@ -16,10 +16,10 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "time"] }
 x509-parser = "0.14"
-winreg = "0.52"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.52", features = ["Win32_Networking_WinInet", "Win32_Foundation"] }
+winreg = "0.52"
 
 flowly = { path = "../..", package = "flowly", default-features = false }
 mitm-core = { path = "../../crates/core", package = "flowly-core", default-features = false, features = ["h2"] }
