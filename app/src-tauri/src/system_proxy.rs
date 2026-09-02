@@ -5,8 +5,11 @@
 
 /// 保存的旧系统代理配置，用于停止时还原。
 pub struct SystemProxyGuard {
+    #[cfg(target_os = "windows")]
     old_enable: u32,
+    #[cfg(target_os = "windows")]
     old_server: String,
+    #[cfg(target_os = "windows")]
     old_override: Option<String>,
 }
 
@@ -107,6 +110,7 @@ pub fn clear_stale_system_proxy(_addr: &str) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(any(target_os = "windows", test))]
 fn merge_local_proxy_override(existing: Option<&str>) -> String {
     let mut parts: Vec<String> = existing
         .unwrap_or_default()
@@ -125,6 +129,7 @@ fn merge_local_proxy_override(existing: Option<&str>) -> String {
     parts.join(";")
 }
 
+#[cfg(any(target_os = "windows", test))]
 fn proxy_server_uses_addr(proxy_server: &str, addr: &str) -> bool {
     proxy_server.split(';').any(|part| {
         let value = part
